@@ -73,12 +73,18 @@ class Fetcher:
 
 
 def strip_session_noise(html: str) -> str:
-    """剝除 ASP.NET session 雜訊欄位，避免每日快照產生無意義 diff。"""
-    return re.sub(
+    """剝除 ASP.NET session 雜訊，避免每日快照產生無意義 diff。
+
+    - VIEWSTATE 等 hidden 欄位值
+    - punish_view.aspx 的 sch= 加密 token（綁 session，每次連線都不同；
+      快照身分由穩定檔名承載，token 無資料價值）
+    """
+    html = re.sub(
         r'(id="(?:__VIEWSTATE|__VIEWSTATEGENERATOR|__EVENTVALIDATION)") value="[^"]*"',
         r"\1",
         html,
     )
+    return re.sub(r"(punish_view\.aspx\?sch=)[A-Za-z0-9+/=%]*", r"\1", html)
 
 
 def save(path: Path, html: str) -> bool:
