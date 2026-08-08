@@ -1,4 +1,7 @@
-# 裁罰公告每日備份
+# 裁罰公告每日備份（僅社家署）
+#
+# 教保網（ap.ece.moe.edu.tw）封鎖境外 IP，GitHub Actions（美國）連不上，
+# 由本機 launchd 排程負責（見 scripts/local_backup.sh）。
 #
 # 平日：--new-only 增量（列表全掃、詳情只抓新出現的），控制 Actions 分鐘數。
 # 週六：全量重抓，補上既有紀錄的內容變更與下架偵測所需的完整快照。
@@ -50,15 +53,11 @@ jobs:
           echo "flag=$([ "$MODE" = "new-only" ] && echo --new-only)" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
 
-      - name: 執行備份（社家署＋教保網）
+      - name: 執行備份（社家署）
         run: |
           set +e
           python3 crawler/sfaa_crc.py --data-dir data ${{ steps.mode.outputs.flag }}
-          SFAA=$?
-          python3 crawler/ece_moe.py --data-dir data ${{ steps.mode.outputs.flag }}
-          ECE=$?
-          echo "SFAA=$SFAA" >> "$GITHUB_ENV"
-          echo "ECE=$ECE" >> "$GITHUB_ENV"
+          echo "SFAA=$?" >> "$GITHUB_ENV"
           exit 0
 
       - name: 提交資料 repo
@@ -77,5 +76,4 @@ jobs:
       - name: 回報爬蟲失敗
         run: |
           [ "$SFAA" = "0" ] || echo "::error::sfaa_crc.py exit=$SFAA"
-          [ "$ECE" = "0" ] || echo "::error::ece_moe.py exit=$ECE"
-          [ "$SFAA" = "0" ] && [ "$ECE" = "0" ]
+          [ "$SFAA" = "0" ]
