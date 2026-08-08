@@ -88,9 +88,13 @@ def strip_session_noise(html: str) -> str:
 
 
 def save(path: Path, html: str) -> bool:
-    """寫入快照；內容與現存檔案相同時不動檔案。回傳是否有寫入。"""
+    """寫入 HTML 快照；內容與現存檔案相同時不動檔案。回傳是否有寫入。
+
+    快照規格：行尾統一為 LF。伺服器回應是 CRLF，統一後 git diff 乾淨，
+    也不受任何工具的隱式行尾轉換影響。二進位檔（PDF）不走此函式。
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = html.encode("utf-8")
+    data = html.replace("\r\n", "\n").encode("utf-8")
     if path.exists() and path.read_bytes() == data:
         return False
     path.write_bytes(data)
