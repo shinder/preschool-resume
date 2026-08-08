@@ -31,10 +31,10 @@ jobs:
     timeout-minutes: 300
     steps:
       - name: Checkout 爬蟲程式碼
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout 資料 repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: shinder/preschool-resume-data
           ssh-key: ${{ secrets.DATA_REPO_SSH_KEY }}
