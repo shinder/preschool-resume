@@ -1,0 +1,81 @@
+# 裁罰公告每日備份
+#
+# 平日：--new-only 增量（列表全掃、詳情只抓新出現的），控制 Actions 分鐘數。
+# 週六：全量重抓，補上既有紀錄的內容變更與下架偵測所需的完整快照。
+#
+# 需要的設定（在 GitHub 上完成一次）：
+#   1. 建立 private repo shinder/preschool-resume-data
+#   2. 產生 SSH deploy key，公鑰加到 data repo（Allow write access）
+#   3. 私鑰存入本 repo 的 Actions secret：DATA_REPO_SSH_KEY
+
+name: backup
+
+on:
+  schedule:
+    - cron: "30 21 * * 0-5" # 台北 05:30（週日至週五）：增量
+    - cron: "30 21 * * 6"   # 台北週六 05:30：全量
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "備份模式"
+        type: choice
+        options: [new-only, full]
+        default: new-only
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout 爬蟲程式碼
+        uses: actions/checkout@v4
+
+      - name: Checkout 資料 repo
+        uses: actions/checkout@v4
+        with:
+          repository: shinder/preschool-resume-data
+          ssh-key: ${{ secrets.DATA_REPO_SSH_KEY }}
+          path: data
+
+      - name: 決定備份模式
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ inputs.mode }}"
+          elif [ "${{ github.event.schedule }}" = "30 21 * * 6" ]; then
+            MODE="full"
+          else
+            MODE="new-only"
+          fi
+          echo "flag=$([ "$MODE" = "new-only" ] && echo --new-only)" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+      - name: 執行備份（社家署＋教保網）
+        run: |
+          set +e
+          python3 crawler/sfaa_crc.py --data-dir data ${{ steps.mode.outputs.flag }}
+          SFAA=$?
+          python3 crawler/ece_moe.py --data-dir data ${{ steps.mode.outputs.flag }}
+          ECE=$?
+          echo "SFAA=$SFAA" >> "$GITHUB_ENV"
+          echo "ECE=$ECE" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: 提交資料 repo
+        run: |
+          cd data
+          git add -A
+          if git diff --cached --quiet; then
+            echo "本次無異動"
+          else
+            git config user.name "backup-bot"
+            git config user.email "shinder.lin@gmail.com"
+            git commit -m "備份 $(date +%Y-%m-%d)（${{ steps.mode.outputs.mode }}）"
+            git push
+          fi
+
+      - name: 回報爬蟲失敗
+        run: |
+          [ "$SFAA" = "0" ] || echo "::error::sfaa_crc.py exit=$SFAA"
+          [ "$ECE" = "0" ] || echo "::error::ece_moe.py exit=$ECE"
+          [ "$SFAA" = "0" ] && [ "$ECE" = "0" ]
