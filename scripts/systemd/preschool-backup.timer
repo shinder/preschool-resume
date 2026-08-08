@@ -1,0 +1,9 @@
+[Unit]
+Description=每日 06:30 執行幼兒園裁罰備份
+
+[Timer]
+OnCalendar=*-*-* 06:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
