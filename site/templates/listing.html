@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }}的幼兒園與托嬰中心｜幼兒園履歷{% endblock %}
+{% block description %}{{ heading }}收錄 {{ rows|length }} 家幼兒園與托嬰中心，其中 {{ penalized }} 家有裁罰紀錄。{% endblock %}
+
+{% block main %}
+<div class="wrap">
+
+  <p class="crumb">
+    <a href="/">全台</a>
+    {%- if parent %} ／ <a href="{{ parent.url }}">{{ parent.name }}</a>{% endif %}
+  </p>
+
+  <header class="inst-head">
+    <h1>{{ heading }}</h1>
+    <div class="badges">
+      <span class="badge num">{{ rows|length }} 家機構</span>
+      <span class="badge alert num">{{ penalized }} 家有裁罰紀錄</span>
+    </div>
+  </header>
+
+  {%- if towns %}
+  <section class="section">
+    <h2>鄉鎮市區</h2>
+    <p class="townlist">
+      {%- for t in towns %}
+      <a href="{{ t.url }}">{{ t.name }}<span class="num">（{{ t.penalized }}）</span></a>
+      {%- endfor %}
+    </p>
+  </section>
+  {%- endif %}
+
+  <section class="section">
+    <h2>機構一覽</h2>
+    <table class="roster">
+      <caption>依裁罰筆數排序，同筆數者依名稱排序。</caption>
+      <thead>
+        <tr>
+          <th>名稱</th><th>類型</th>{% if not parent %}<th>鄉鎮市區</th>{% endif %}
+          <th>裁罰</th><th>最近一筆</th>
+        </tr>
+      </thead>
+      <tbody>
+        {%- for r in rows %}
+        <tr>
+          <td><a href="{{ r.url }}">{{ r.name }}</a>
+            {%- if not r.is_active %} <span class="badge closed">已停辦</span>{% endif %}</td>
+          <td>{{ "幼兒園" if r.kind == "preschool" else "托嬰中心" }}</td>
+          {%- if not parent %}<td>{{ r.town or "—" }}</td>{% endif %}
+          <td class="num{% if r.penalty_count %} hit{% endif %}">{{ r.penalty_count or "—" }}</td>
+          <td class="num">{{ r.last_penalty_date or "—" }}</td>
+        </tr>
+        {%- endfor %}
+      </tbody>
+    </table>
+  </section>
+
+</div>
+{% endblock %}

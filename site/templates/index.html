@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}幼兒園履歷｜全台幼兒園與托嬰中心的公開紀錄{% endblock %}
+{% block description %}收錄全台 {{ counts.institutions }} 家幼兒園與托嬰中心的裁罰紀錄，含官方公告到期後已下架、本站仍保留的部分。{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/assets/leaflet.css">
+<link rel="stylesheet" href="/assets/markercluster.css">
+{%- endblock %}
+
+{% block main %}
+<div class="wrap">
+
+  <section class="thesis">
+    <h1>官方公告到期就下架。<span class="quiet">這裡不會。</span></h1>
+    <div class="tally">
+      <div>
+        <b>{{ "{:,}".format(counts.institutions) }}</b>
+        <span>收錄機構</span>
+      </div>
+      <div>
+        <b>{{ "{:,}".format(counts.penalties) }}</b>
+        <span>裁罰紀錄</span>
+      </div>
+      <div class="keep">
+        <b>{{ "{:,}".format(counts.archived_penalties + counts.removed_penalties) }}</b>
+        <span>官方已無、本站保留</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="mapblock">
+    <div class="mapbar">
+      <label><input type="checkbox" id="show-all"> 一併顯示無裁罰紀錄的機構</label>
+      <span id="map-status"></span>
+      <span class="legend">
+        <span><i class="has"></i>有裁罰紀錄</span>
+        <span><i class="none"></i>無裁罰紀錄</span>
+      </span>
+    </div>
+    <div id="map"></div>
+  </section>
+
+  <section class="section">
+    <h2>依縣市瀏覽</h2>
+    <div class="citygrid">
+      {%- for c in cities %}
+      <a href="{{ c.url }}">{{ c.name }}<em>{{ c.penalized }} / {{ c.total }}</em></a>
+      {%- endfor %}
+    </div>
+  </section>
+
+</div>
+<script src="/assets/leaflet.js"></script>
+<script src="/assets/leaflet.markercluster.js"></script>
+<script src="/assets/map.js"></script>
+{% endblock %}

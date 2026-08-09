@@ -1,0 +1,272 @@
+"""靜態站建置（工程執行計劃 6.4）：公開層 JSON → 機構頁／縣市頁／鄉鎮頁／地圖。
+
+輸入是 6.3 的產物（`build/public/`），輸出可直接部署到 Workers static assets。
+頁面型別五種：首頁地圖、機構頁（每家一頁）、縣市頁、鄉鎮市區頁、關於頁。
+裁罰不另立頁而內嵌於機構頁——免費方案靜態資產上限 20,000 檔，這是控制檔案數的
+主要手段（詳見第六階段技術決策表）。
+
+兩道閘門：
+- 檔案數超過 20,000 即中止（撞到就得升 Workers Paid 或縮小建頁範圍）
+- 逸出掃描：資料裡含 `<>&"` 的字串若原樣出現在產物 HTML，代表某處漏了逸出，
+  中止。Jinja2 已全域自動逸出，這道是防止日後有人加 `|safe`。
+
+用法：.venv/bin/python site/build.py [--public PATH] [--out PATH]
+      [--base-url URL] [--index]
+      --index  移除 noindex（6b 掛上正式網域後才用）
+"""
+
+import json
+import sys
+from collections import defaultdict
+from pathlib import Path
+from urllib.parse import quote
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "crawler"))
+
+from common import log  # noqa: E402
+
+try:
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+except ModuleNotFoundError:  # pragma: no cover
+    log("需要 Jinja2：python3 -m venv .venv && .venv/bin/pip install -r requirements.txt")
+    raise
+
+MAX_FILES = 20_000
+DANGEROUS = ('<', '>', '&', '"')
+NEIGHBOUR_LIMIT = 12
+
+
+def inst_path(inst: dict) -> str:
+    return f"/i/{inst['kind']}-{inst['native_id']}.html"
+
+
+def city_path(city: str) -> str:
+    return f"/city/{city}.html"
+
+
+def town_path(city: str, town: str) -> str:
+    return f"/city/{city}/{town}.html"
+
+
+def href(path: str) -> str:
+    """檔名含中文，連結與 sitemap 一律百分比編碼。"""
+    return quote(path, safe="/-_.")
+
+
+def external(url: str | None) -> str | None:
+    if not url:
+        return None
+    return url if url.startswith(("http://", "https://")) else "https://" + url
+
+
+def map_link(inst: dict) -> str | None:
+    """導航用外連。家長看到地址第一件事是想知道在哪、怎麼去。"""
+    q = inst.get("address") or inst.get("name")
+    return f"https://www.google.com/maps/search/?api=1&query={quote(q)}" if q else None
+
+
+def jsonld_for(inst: dict, url: str) -> str:
+    data = {
+        "@context": "https://schema.org",
+        "@type": "Preschool" if inst["kind"] == "preschool" else "ChildCare",
+        "name": inst["name"],
+        "url": url,
+        "address": {"@type": "PostalAddress", "addressCountry": "TW",
+                    "addressRegion": inst.get("city"),
+                    "addressLocality": inst.get("town"),
+                    "streetAddress": inst.get("address"),
+                    "postalCode": inst.get("postal_code")},
+    }
+    if inst.get("lat") is not None and inst.get("lng") is not None:
+        data["geo"] = {"@type": "GeoCoordinates",
+                       "latitude": inst["lat"], "longitude": inst["lng"]}
+    if inst.get("phone"):
+        data["telephone"] = inst["phone"]
+    # 內嵌於 <script>，把 < 轉義避免提前關閉標籤
+    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+
+
+def dangerous_strings(*records) -> list[str]:
+    out = set()
+    for r in records:
+        for v in r.values():
+            if isinstance(v, str) and any(c in v for c in DANGEROUS):
+                out.add(v)
+    return sorted(out)
+
+
+def write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def main(argv: list[str]) -> int:
+    def opt(name: str, default=None):
+        return argv[argv.index(name) + 1] if name in argv else default
+
+    known = {"--public", "--out", "--base-url", "--index"}
+    for a in argv:
+        if a.startswith("--") and a not in known:
+            log(f"未知參數：{a}")
+            return 2
+
+    repo = Path(__file__).resolve().parent.parent
+    public = Path(opt("--public", repo / "build" / "public"))
+    out = Path(opt("--out", repo / "build" / "site"))
+    base_url = opt("--base-url", "https://preschool-resume.workers.dev").rstrip("/")
+    noindex = "--index" not in argv
+
+    if not (public / "institutions.json").exists():
+        log(f"缺少公開層資料，請先執行 site/public_data.py：{public}")
+        return 2
+
+    def load(name, key):
+        return json.loads((public / name).read_text(encoding="utf-8"))[key]
+
+    institutions = load("institutions.json", "records")
+    penalties = load("penalties.json", "records")
+    aliases = load("aliases.json", "aliases")
+    meta = json.loads((public / "meta.json").read_text(encoding="utf-8"))
+    as_of = meta["as_of"]
+
+    by_inst = defaultdict(list)
+    for p in penalties:
+        by_inst[p["institution_id"]].append(p)
+    for rows in by_inst.values():
+        rows.sort(key=lambda r: (r.get("penalty_date") or "", r["id"]), reverse=True)
+    alias_by_inst = defaultdict(list)
+    for a in aliases:
+        if a.get("institution_id"):
+            alias_by_inst[a["institution_id"]].append(a)
+    # 兩個來源的收錄起點不同（教保網回補自 2014、兒少法自 2011），分開算才不會誤述
+    coverage = {}
+    for p in penalties:
+        src, d = p["source"], p.get("penalty_date")
+        if d:
+            coverage[src] = min(coverage.get(src, d), d)
+
+    env = Environment(loader=FileSystemLoader(repo / "site" / "templates"),
+                      autoescape=select_autoescape(["html", "xml"]),
+                      trim_blocks=True, lstrip_blocks=True)
+    env.globals.update(as_of=as_of, noindex=noindex, base_url=base_url)
+
+    # ---------- 索引：縣市／鄉鎮市區 ----------
+    by_city, by_town = defaultdict(list), defaultdict(list)
+    rows_by_id = {}
+    for inst in institutions:
+        row = {"name": inst["name"], "kind": inst["kind"], "town": inst.get("town"),
+               "url": href(inst_path(inst)), "penalty_count": inst["penalty_count"],
+               "last_penalty_date": inst.get("last_penalty_date"),
+               "is_active": inst.get("is_active", True)}
+        rows_by_id[inst["id"]] = row
+        by_city[inst["city"] or "未分類"].append(row)
+        if inst.get("town"):
+            by_town[(inst["city"] or "未分類", inst["town"])].append(row)
+
+    def order(rows):
+        return sorted(rows, key=lambda r: (-(r["penalty_count"] or 0), r["name"]))
+
+    urls = [{"path": "/", "priority": "1.0"}, {"path": "/about.html"}]
+    files = 0
+
+    # ---------- 機構頁 ----------
+    escape_failures = []
+    for inst in institutions:
+        path = inst_path(inst)
+        url = base_url + href(path)
+        rows = by_inst.get(inst["id"], [])
+        entries = [{**p, "archived": bool(p.get("removed_at"))} for p in rows]
+        siblings = [r for r in by_town.get((inst["city"], inst.get("town")), [])
+                    if r["url"] != href(path) and r["kind"] == inst["kind"]]
+        html = env.get_template("institution.html").render(
+            inst=inst, penalties=entries, aliases=alias_by_inst.get(inst["id"], []),
+            archived_count=sum(1 for p in entries if p["archived"]),
+            city_url=href(city_path(inst["city"])) if inst.get("city") else "/",
+            town_url=href(town_path(inst["city"], inst["town"])) if inst.get("town") else None,
+            neighbours=order(siblings)[:NEIGHBOUR_LIMIT],
+            full_url=external(inst.get("url")), jsonld=jsonld_for(inst, url),
+            map_url=map_link(inst),
+            coverage_from=coverage.get(inst["source"], as_of)[:4])
+        for raw in dangerous_strings(inst, *rows, *alias_by_inst.get(inst["id"], [])):
+            if raw in html:
+                escape_failures.append((path, raw[:60]))
+        write(out / path.lstrip("/"), html)
+        files += 1
+        urls.append({"path": href(path), "priority": "0.8" if rows else None})
+
+    # ---------- 縣市頁與鄉鎮市區頁 ----------
+    city_cards = []
+    listing = env.get_template("listing.html")
+    for city, rows in sorted(by_city.items()):
+        towns = [{"name": town, "url": href(town_path(city, town)),
+                  "penalized": sum(1 for r in trows if r["penalty_count"])}
+                 for (c, town), trows in sorted(by_town.items()) if c == city]
+        html = listing.render(heading=city, rows=order(rows), towns=towns, parent=None,
+                              penalized=sum(1 for r in rows if r["penalty_count"]))
+        write(out / city_path(city).lstrip("/"), html)
+        files += 1
+        urls.append({"path": href(city_path(city)), "priority": "0.6"})
+        city_cards.append({"name": city, "url": href(city_path(city)),
+                           "total": len(rows),
+                           "penalized": sum(1 for r in rows if r["penalty_count"])})
+
+    for (city, town), rows in sorted(by_town.items()):
+        html = listing.render(heading=f"{city}{town}", rows=order(rows), towns=None,
+                              parent={"name": city, "url": href(city_path(city))},
+                              penalized=sum(1 for r in rows if r["penalty_count"]))
+        write(out / town_path(city, town).lstrip("/"), html)
+        files += 1
+        urls.append({"path": href(town_path(city, town)), "priority": "0.5"})
+
+    # ---------- 首頁、關於頁 ----------
+    write(out / "index.html", env.get_template("index.html").render(
+        counts=meta["counts"], cities=city_cards))
+    write(out / "about.html", env.get_template("about.html").render(
+        counts=meta["counts"], sources=meta["sources"]))
+    files += 2
+
+    # ---------- 地圖點位 ----------
+    def point(inst):
+        return [inst["lng"], inst["lat"], inst["penalty_count"], inst["name"],
+                href(inst_path(inst))]
+
+    located = [i for i in institutions if i.get("lng") is not None]
+    penalized = [i for i in located if i["penalty_count"]]
+    for name, rows in (("points-penalized.json", penalized), ("points-all.json", located)):
+        write(out / "data" / name, json.dumps(
+            {"cols": ["lng", "lat", "n", "name", "url"],
+             "rows": [point(i) for i in rows]}, ensure_ascii=False))
+        files += 1
+
+    # ---------- sitemap 與 robots ----------
+    write(out / "sitemap.xml", env.get_template("sitemap.xml").render(urls=urls))
+    # 6a 期間靠頁面上的 noindex，robots 仍允許檢索——擋掉檢索就讀不到 noindex
+    write(out / "robots.txt",
+          f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n")
+    files += 2
+
+    assets = repo / "site" / "assets"
+    for f in sorted(assets.iterdir()):
+        if f.is_file():
+            write(out / "assets" / f.name, f.read_text(encoding="utf-8"))
+            files += 1
+
+    log(f"產出 {files:,} 檔於 {out}：機構 {len(institutions):,}、"
+        f"縣市 {len(city_cards)}、鄉鎮市區 {len(by_town)}；"
+        f"地圖點位 {len(penalized):,}／{len(located):,}")
+    if noindex:
+        log("全站掛 noindex（6a）；6b 掛正式網域時加 --index")
+
+    if escape_failures:
+        for path, raw in escape_failures[:10]:
+            log(f"  逸出失敗：{path} 出現原始字串「{raw}」")
+        log(f"中止：{len(escape_failures)} 處資料未經 HTML 逸出")
+        return 1
+    if files >= MAX_FILES:
+        log(f"中止：檔案數 {files:,} 已達免費方案上限 {MAX_FILES:,}")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,246 @@
+/* 幼兒園裁罰紀錄存查
+   視覺語彙取自公文：冷灰紙底、靛藍結構、硃砂只給存檔標記。
+   機器可讀的識別碼（文號／日期／金額／統計）一律等寬，人讀敘述走中文系統字。 */
+
+:root {
+  --paper: #f5f7f8;
+  --card: #ffffff;
+  --field: #edf1f3;
+  --rule: #d4dce2;
+  --ink: #1b2430;
+  --ink-soft: #5a6875;
+  --indigo: #234e70;
+  --indigo-soft: #e5edf3;
+  --seal: #b23a2f;
+  --seal-soft: #f7e9e7;
+
+  --sans: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Helvetica Neue",
+    system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --wrap: 68rem;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+}
+
+a { color: var(--indigo); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--seal); }
+:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+
+.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 1.25rem; }
+
+/* ---------- 頁首與頁尾 ---------- */
+
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  background: var(--card);
+}
+.masthead .wrap {
+  display: flex; align-items: baseline; gap: 1.25rem;
+  padding-block: 0.85rem; flex-wrap: wrap;
+}
+.masthead .logo {
+  font-weight: 700; font-size: 1rem; letter-spacing: 0.06em;
+  color: var(--ink); text-decoration: none;
+}
+.masthead .tagline { font-size: 0.8125rem; color: var(--ink-soft); }
+.masthead nav { margin-inline-start: auto; display: flex; gap: 1.1rem; font-size: 0.875rem; }
+@media (max-width: 34rem) { .masthead .tagline { display: none; } }
+
+.sitefoot {
+  margin-top: 4rem; border-top: 1px solid var(--rule);
+  background: var(--card); color: var(--ink-soft);
+  font-size: 0.8125rem; padding-block: 1.75rem 2.5rem;
+}
+.sitefoot p { margin: 0.35rem 0; }
+.sitefoot .stamp { font-family: var(--mono); }
+
+/* ---------- 首頁主張 ---------- */
+
+.thesis { padding-block: 3.5rem 2rem; }
+.thesis h1 {
+  margin: 0 0 1.75rem;
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  line-height: 1.35; letter-spacing: -0.01em; font-weight: 700;
+}
+.thesis h1 .quiet { color: var(--ink-soft); font-weight: 400; display: block; }
+
+.tally { display: flex; flex-wrap: wrap; gap: 2.5rem 3.5rem; }
+.tally div { min-width: 6rem; }
+.tally b {
+  display: block; font-family: var(--mono); font-weight: 600;
+  font-size: clamp(1.75rem, 6vw, 2.5rem); line-height: 1.1;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.tally span { font-size: 0.8125rem; color: var(--ink-soft); }
+.tally .keep b { color: var(--seal); }
+.tally .keep { padding-inline-start: 1rem; border-inline-start: 3px solid var(--seal); }
+
+/* ---------- 地圖 ---------- */
+
+.mapblock { margin-top: 2.5rem; }
+.mapbar {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: 0.6rem 0.9rem; border: 1px solid var(--rule); border-bottom: 0;
+  background: var(--card); font-size: 0.8125rem; color: var(--ink-soft);
+}
+.mapbar label { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+#map { height: min(62vh, 34rem); border: 1px solid var(--rule); background: var(--field); }
+.leaflet-container { font-family: var(--sans); }
+
+/* NLSC 在低倍率是地形渲染（綠山藍海），直接當底圖太搶。
+   降飽和＋提亮，把它壓成淡灰底，硃砂標記才跳得出來，中文地名也還讀得到。 */
+.leaflet-tile-pane { filter: saturate(0.28) brightness(1.1) contrast(0.92); }
+
+/* 自訂聚合標記：預設的綠黃橘與本站配色衝突，改用硃砂三階 */
+.marker-cluster {
+  background: rgba(178, 58, 47, 0.18); border-radius: 50%; background-clip: padding-box;
+}
+.marker-cluster div {
+  width: 30px; height: 30px; margin: 5px; border-radius: 50%;
+  background: rgba(178, 58, 47, 0.85); color: #fff; text-align: center;
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.marker-cluster span { line-height: 30px; }
+.marker-cluster-medium div { background: rgba(150, 44, 35, 0.9); }
+.marker-cluster-large { background: rgba(120, 34, 27, 0.2); }
+.marker-cluster-large div { background: rgba(120, 34, 27, 0.92); }
+.leaflet-popup-content { font-size: 0.875rem; line-height: 1.6; }
+
+.legend { display: flex; gap: 1rem; margin-inline-start: auto; }
+.legend i {
+  width: 0.7rem; height: 0.7rem; border-radius: 50%;
+  display: inline-block; margin-inline-end: 0.3rem; vertical-align: -1px;
+}
+.legend .has { background: var(--seal); }
+.legend .none { background: #9bb0bf; }
+
+/* ---------- 區段標題 ---------- */
+
+.section { margin-top: 3rem; }
+.section > h2 {
+  margin: 0 0 1rem; font-size: 1rem; font-weight: 700;
+  letter-spacing: 0.08em; color: var(--ink-soft);
+  padding-bottom: 0.5rem; border-bottom: 1px solid var(--rule);
+}
+
+/* ---------- 縣市索引 ---------- */
+
+.citygrid { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+.citygrid a {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
+  padding: 0.65rem 0.85rem; background: var(--card);
+  border: 1px solid var(--rule); text-decoration: none; color: var(--ink);
+}
+.citygrid a:hover { border-color: var(--indigo); }
+.citygrid em {
+  font-family: var(--mono); font-style: normal; font-size: 0.8125rem;
+  color: var(--seal); font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 機構頁 ---------- */
+
+.crumb { font-size: 0.8125rem; color: var(--ink-soft); padding-top: 1.5rem; }
+.crumb a { color: var(--ink-soft); }
+
+.inst-head { padding-block: 0.5rem 1.5rem; border-bottom: 1px solid var(--rule); }
+.inst-head h1 {
+  margin: 0.25rem 0 0.75rem; font-size: clamp(1.4rem, 4vw, 2rem);
+  line-height: 1.35; letter-spacing: -0.01em;
+}
+.badges { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.badge {
+  font-size: 0.75rem; padding: 0.2rem 0.55rem; border: 1px solid var(--rule);
+  background: var(--field); color: var(--ink-soft); border-radius: 2px;
+}
+.badge.alert { background: var(--seal-soft); border-color: #e3bfba; color: var(--seal); font-weight: 600; }
+.badge.closed { background: #eceff1; color: #6b7a86; }
+.badge.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* 單欄時裁罰紀錄先出現——那是來訪者要找的東西，基本資料退到後面 */
+.columns { display: grid; gap: 2.5rem; margin-top: 2rem; }
+.columns > .main { order: 1; }
+.columns > .aside { order: 2; }
+@media (min-width: 56rem) {
+  .columns { grid-template-columns: 19rem 1fr; align-items: start; }
+  .columns > .aside { order: 0; position: sticky; top: 1.5rem; }
+}
+.columns > .main { min-width: 0; }
+
+/* 基本資料表 */
+.facts { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.facts th, .facts td { text-align: start; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.facts th { width: 6.5rem; font-weight: 500; color: var(--ink-soft); }
+.facts td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Signature：裁罰卷宗條目 */
+.ledger { display: grid; gap: 0.9rem; }
+.entry {
+  background: var(--card); border: 1px solid var(--rule);
+  border-inline-start: 3px solid var(--indigo); padding: 0.9rem 1.1rem;
+}
+.entry.archived { border-inline-start-color: var(--seal); }
+.entry header {
+  display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;
+  margin-bottom: 0.6rem; padding-bottom: 0.5rem; border-bottom: 1px dashed var(--rule);
+}
+.entry time {
+  font-family: var(--mono); font-size: 1rem; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.entry .docno {
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-soft);
+  word-break: break-all;
+}
+.entry .state { margin-inline-start: auto; font-size: 0.75rem; }
+.entry .state.archived { color: var(--seal); font-weight: 600; }
+.entry dl { margin: 0; display: grid; gap: 0.4rem 0.9rem; font-size: 0.875rem; }
+@media (min-width: 34rem) { .entry dl { grid-template-columns: 5.5rem 1fr; } }
+.entry dt { color: var(--ink-soft); }
+.entry dd { margin: 0; }
+.entry .former { margin-top: 0.6rem; font-size: 0.8125rem; color: var(--seal); }
+
+.empty {
+  background: var(--card); border: 1px dashed var(--rule);
+  padding: 1.5rem; color: var(--ink-soft); font-size: 0.9375rem;
+}
+
+/* 機構列表 */
+.roster { width: 100%; border-collapse: collapse; font-size: 0.9375rem; background: var(--card); }
+.roster caption { text-align: start; color: var(--ink-soft); font-size: 0.8125rem; padding-bottom: 0.5rem; }
+.roster th, .roster td { text-align: start; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--rule); }
+.roster thead th { font-size: 0.75rem; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 500; }
+.roster td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: end; white-space: nowrap; }
+.roster td.num.hit { color: var(--seal); font-weight: 600; }
+.roster tbody tr:hover { background: var(--field); }
+
+.townlist { display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; font-size: 0.875rem; }
+
+.prose { max-width: 44rem; }
+.prose h2 { font-size: 1.0625rem; margin-top: 2rem; }
+.prose li { margin-bottom: 0.35rem; }
+.prose code { font-family: var(--mono); font-size: 0.875em; background: var(--field); padding: 0.1em 0.3em; }
+
+.follow {
+  margin-top: 2.5rem; padding: 1.1rem 1.25rem;
+  background: var(--indigo-soft); border: 1px solid #cddceb;
+}
+.follow h2 { margin: 0 0 0.35rem; font-size: 0.9375rem; }
+.follow p { margin: 0; font-size: 0.875rem; color: var(--ink-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

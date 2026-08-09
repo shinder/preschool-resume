@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set kind_label = "幼兒園" if inst.kind == "preschool" else "托嬰中心" %}
+{% block title %}{{ inst.name }}｜園所履歷{% endblock %}
+{% block description %}
+{%- if inst.penalty_count -%}
+{{ inst.name }}（{{ inst.city }}{{ inst.town }}）共 {{ inst.penalty_count }} 筆裁罰紀錄，含官方已下架仍保留者，另附核定人數、收費與立案資料。
+{%- else -%}
+{{ inst.name }}（{{ inst.city }}{{ inst.town }}）目前查無裁罰紀錄，本頁提供核定人數、收費與立案等基本資料。
+{%- endif -%}
+{% endblock %}
+{% block head %}
+<script type="application/ld+json">{{ jsonld }}</script>
+{%- endblock %}
+
+{% block main %}
+<div class="wrap">
+
+  <p class="crumb">
+    <a href="/">全台</a> ／ <a href="{{ city_url }}">{{ inst.city }}</a>
+    {%- if town_url %} ／ <a href="{{ town_url }}">{{ inst.town }}</a>{% endif %}
+  </p>
+
+  <header class="inst-head">
+    <h1>{{ inst.name }}</h1>
+    <div class="badges">
+      <span class="badge">{{ kind_label }}</span>
+      {%- if inst.org_type %}<span class="badge">{{ inst.org_type }}</span>{% endif %}
+      {%- if not inst.is_active %}<span class="badge closed">名冊顯示已停辦</span>{% endif %}
+      {%- if inst.penalty_count %}
+      <span class="badge alert num">{{ inst.penalty_count }} 筆裁罰紀錄</span>
+      {%- endif %}
+      {%- if archived_count %}
+      <span class="badge alert num">{{ archived_count }} 筆官方已無</span>
+      {%- endif %}
+      {%- if inst.pre_public and inst.pre_public != "無" %}
+      <span class="badge">準公共 {{ inst.pre_public }}</span>
+      {%- endif %}
+    </div>
+  </header>
+
+  <div class="columns">
+    <aside class="aside">
+      <table class="facts">
+        <caption class="visually-hidden"></caption>
+        <tbody>
+          <tr><th>地址</th><td>{{ inst.address or "—" }}
+            {%- if map_url %}<br><a href="{{ map_url }}" rel="nofollow noopener" target="_blank">在地圖上開啟</a>{% endif %}</td></tr>
+          {%- if inst.phone %}<tr><th>電話</th><td class="num">{{ inst.phone }}</td></tr>{% endif %}
+          {%- if inst.capacity_approved %}
+          <tr><th>核定{{ "人數" if inst.kind == "preschool" else "收托" }}</th>
+              <td class="num">{{ inst.capacity_approved }} 人</td></tr>
+          {%- endif %}
+          {%- if inst.enrolled is not none %}
+          <tr><th>實際收托</th><td class="num">{{ inst.enrolled }} 人</td></tr>
+          {%- endif %}
+          {%- if inst.monthly_fee %}<tr><th>月費參考</th><td class="num">{{ "{:,}".format(inst.monthly_fee) }} 元</td></tr>{% endif %}
+          {%- if inst.free5 %}<tr><th>五歲免學費</th><td>{{ inst.free5 }}</td></tr>{% endif %}
+          {%- if inst.after_school %}<tr><th>課後留園</th><td>{{ inst.after_school }}</td></tr>{% endif %}
+          {%- if inst.shuttle %}<tr><th>幼童專用車</th><td>{{ inst.shuttle }}</td></tr>{% endif %}
+          {%- if inst.area_indoor %}<tr><th>室內面積</th><td class="num">{{ inst.area_indoor }}</td></tr>{% endif %}
+          {%- if inst.area_outdoor %}<tr><th>室外面積</th><td class="num">{{ inst.area_outdoor }}</td></tr>{% endif %}
+          {%- if inst.floor %}<tr><th>使用樓層</th><td>{{ inst.floor }}</td></tr>{% endif %}
+          {%- if inst.reg_no %}<tr><th>立案文號</th><td class="num">{{ inst.reg_no }}</td></tr>{% endif %}
+          {%- if inst.reg_date %}<tr><th>立案日期</th><td class="num">{{ inst.reg_date }}</td></tr>{% endif %}
+          {%- if inst.url %}<tr><th>網站</th><td><a href="{{ full_url }}" rel="nofollow noopener">{{ inst.url }}</a></td></tr>{% endif %}
+        </tbody>
+      </table>
+
+      {%- if aliases %}
+      <div class="section">
+        <h2>曾用名稱</h2>
+        <table class="facts"><tbody>
+          {%- for a in aliases %}
+          <tr>
+            <th>{{ "換受託單位" if a.type == "operator_change" else "原名" }}</th>
+            <td>{{ a.former_name }}
+              {%- if a.last_penalty_date %}<br><span class="num">至 {{ a.last_penalty_date }}</span>{% endif %}</td>
+          </tr>
+          {%- endfor %}
+        </tbody></table>
+      </div>
+      {%- endif %}
+    </aside>
+
+    <div class="main">
+      <section class="section">
+        <h2>裁罰紀錄{% if penalties %}（{{ penalties|length }} 筆）{% endif %}</h2>
+        {%- if penalties %}
+        <div class="ledger">
+          {%- for p in penalties %}
+          <article class="entry{% if p.archived %} archived{% endif %}">
+            <header>
+              <time datetime="{{ p.penalty_date }}">{{ p.penalty_date }}</time>
+              {%- if p.doc_no %}<span class="docno">{{ p.doc_no }}</span>{% endif %}
+              <span class="state{% if p.archived %} archived{% endif %}">
+                {{- "官方已無、本站保留" if p.archived else "官方公告中" -}}
+              </span>
+            </header>
+            <dl>
+              {%- if p.law %}<dt>依據法規</dt><dd>{{ p.law }}</dd>{% endif %}
+              {%- if p.violation %}<dt>違反規定</dt><dd>{{ p.violation }}</dd>{% endif %}
+              {%- if p.fact %}<dt>事實摘要</dt><dd>{{ p.fact }}</dd>{% endif %}
+              {%- if p.sanction %}<dt>處分內容</dt><dd>{{ p.sanction }}</dd>{% endif %}
+            </dl>
+            {%- if p.name_at_penalty %}
+            <p class="former">處分時名稱：{{ p.name_at_penalty }}</p>
+            {%- endif %}
+          </article>
+          {%- endfor %}
+        </div>
+        {%- else %}
+        <p class="empty">目前查無裁罰紀錄。本站收錄自 {{ coverage_from }} 起的公告，含官方已下架者。</p>
+        {%- endif %}
+      </section>
+
+      {%- if neighbours %}
+      <section class="section">
+        <h2>{{ inst.city }}{{ inst.town }}的其他{{ kind_label }}</h2>
+        <table class="roster">
+          <thead><tr><th>名稱</th><th>裁罰</th></tr></thead>
+          <tbody>
+            {%- for n in neighbours %}
+            <tr>
+              <td><a href="{{ n.url }}">{{ n.name }}</a></td>
+              <td class="num{% if n.penalty_count %} hit{% endif %}">{{ n.penalty_count or "—" }}</td>
+            </tr>
+            {%- endfor %}
+          </tbody>
+        </table>
+      </section>
+      {%- endif %}
+
+      <div class="follow">
+        <h2>這家機構再被裁罰時通知我</h2>
+        <p>LINE 訂閱功能整備中。上線後可在這裡追蹤單一機構，有新裁罰即推播。</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
