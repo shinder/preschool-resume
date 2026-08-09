@@ -72,13 +72,15 @@ a:hover { color: var(--seal); }
 
 /* ---------- 首頁主張 ---------- */
 
-.thesis { padding-block: 3.5rem 2rem; }
+.thesis { padding-block: 3rem 2rem; }
 .thesis h1 {
   margin: 0 0 1.75rem;
-  font-size: clamp(1.75rem, 5vw, 2.75rem);
-  line-height: 1.35; letter-spacing: -0.01em; font-weight: 700;
+  font-size: clamp(1.3rem, 3.4vw, 1.9rem);
+  line-height: 1.4; letter-spacing: -0.01em; font-weight: 700;
 }
+/* 窄螢幕斷成兩行才讀得順；桌機一行放得下（18 字 × 1.9rem 約 580px） */
 .thesis h1 .quiet { color: var(--ink-soft); font-weight: 400; display: block; }
+@media (min-width: 44rem) { .thesis h1 .quiet { display: inline; } }
 
 .tally { display: flex; flex-wrap: wrap; gap: 2.5rem 3.5rem; }
 .tally div { min-width: 6rem; }
