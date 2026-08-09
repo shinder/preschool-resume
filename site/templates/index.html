@@ -29,11 +29,20 @@
 
   <section class="mapblock">
     <div class="mapbar">
-      <label><input type="checkbox" id="show-all"> 一併顯示其餘機構（含僅有更早紀錄者）</label>
+      <label for="map-mode">顯示</label>
+      <select id="map-mode">
+        <option value="penalty">裁罰紀錄</option>
+        <option value="vacancy">托嬰中心空位</option>
+      </select>
+      <label id="show-all-label"><input type="checkbox" id="show-all"> 一併顯示其餘機構（含僅有更早紀錄者）</label>
       <span id="map-status"></span>
-      <span class="legend">
+      <span class="legend" id="legend-penalty">
         <span><i class="has"></i>近 {{ recent_years }} 年有裁罰</span>
         <span><i class="none"></i>其餘</span>
+      </span>
+      <span class="legend" id="legend-vacancy" hidden>
+        <span><i class="open"></i>有空位</span>
+        <span><i class="none"></i>已額滿</span>
       </span>
     </div>
     <div id="map"></div>

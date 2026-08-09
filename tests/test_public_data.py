@@ -131,6 +131,9 @@ def main():
         baby = insts["babycare:CW1"]
         assert baby["grade"] == "甲等" and baby["staff"]["托育人員"] == 6
         assert baby["fees"][0]["note"] == "洽負責人李○○", baby["fees"]
+        # 缺額＝核定收托−實際收托，只有托嬰中心兩個數字都有
+        assert baby["vacancy"] == 5, baby
+        assert insts["preschool:a"]["vacancy"] is None
         assert not ({"person", "targets", "files", "school"} & set(pens["ece:1"])), pens["ece:1"]
 
         # 自然人裁罰整筆不進公開層

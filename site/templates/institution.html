@@ -38,6 +38,11 @@
       {%- if inst.pre_public and inst.pre_public != "無" %}
       <span class="badge">{{ "準公共" if inst.pre_public == "是" else "準公共 " ~ inst.pre_public }}</span>
       {%- endif %}
+      {%- if inst.vacancy is defined and inst.vacancy is not none %}
+      <span class="badge num{{ ' open' if inst.vacancy > 0 else '' }}">
+        {{- "尚有 " ~ inst.vacancy ~ " 個空位" if inst.vacancy > 0 else "已額滿" -}}
+      </span>
+      {%- endif %}
       {%- if inst.grade %}
       <span class="badge">評鑑{{ inst.grade }}{% if inst.grade_year %}（{{ inst.grade_year }} 年度）{% endif %}</span>
       {%- endif %}
@@ -58,6 +63,11 @@
           {%- endif %}
           {%- if inst.enrolled is not none %}
           <tr><th>實際收托</th><td class="num">{{ inst.enrolled }} 人</td></tr>
+          {%- endif %}
+          {%- if inst.vacancy is defined and inst.vacancy is not none %}
+          <tr><th>目前空位</th><td class="num">
+            {{- "尚有 " ~ inst.vacancy ~ " 個空位" if inst.vacancy > 0 else "已額滿" -}}
+          </td></tr>
           {%- endif %}
           {%- if inst.monthly_fee %}<tr><th>月費參考</th><td class="num">{{ "{:,}".format(inst.monthly_fee) }} 元</td></tr>{% endif %}
           {%- if inst.free5 %}<tr><th>五歲免學費</th><td>{{ inst.free5 }}</td></tr>{% endif %}

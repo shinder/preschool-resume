@@ -139,6 +139,11 @@ def project_institutions(institutions: list[dict], summary: dict) -> list[dict]:
         # archived ＝ 2.4 回補的歷史紀錄（removed_at="unknown"，下架日不明）
         pub["removed_penalty_count"] = s.get("removed", 0)
         pub["archived_penalty_count"] = s.get("archived", 0)
+        # 缺額：托嬰中心才有實際收托數（站方快照時點值，非即時）
+        cap, enrolled = pub.get("capacity_approved"), pub.get("enrolled")
+        pub["vacancy"] = (cap - enrolled
+                          if isinstance(cap, int) and isinstance(enrolled, int)
+                          and cap > 0 else None)
         out.append(pub)
     return out
 
@@ -292,7 +297,7 @@ def main(argv: list[str]) -> int:
     # 白名單自我檢查：輸出不得出現白名單以外的欄位
     for rows, allowed, label in ((pub_institutions, INSTITUTION_FIELDS + (
             "penalty_count", "recent_penalty_count", "last_penalty_date",
-            "removed_penalty_count", "archived_penalty_count"), "機構"),
+            "removed_penalty_count", "archived_penalty_count", "vacancy"), "機構"),
             (pub_penalties, PENALTY_FIELDS, "裁罰"),
             (pub_aliases, ALIAS_FIELDS, "別名")):
         extra = {k for r in rows for k in r} - set(allowed)

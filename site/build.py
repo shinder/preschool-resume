@@ -241,14 +241,24 @@ def main(argv: list[str]) -> int:
         return [inst["lng"], inst["lat"], inst.get("recent_penalty_count", 0),
                 inst["name"], href(inst_path(inst))]
 
+    def vacancy_point(inst):
+        return [inst["lng"], inst["lat"], inst["vacancy"], inst["name"],
+                href(inst_path(inst)), inst["capacity_approved"], inst["enrolled"]]
+
     located = [i for i in institutions if i.get("lng") is not None]
     # 地圖預設只標近五年——一筆多年前的舊紀錄不該讓機構永遠是紅點
     penalized = [i for i in located if i.get("recent_penalty_count")]
+    # 缺額圖層：只有托嬰中心有實際收托數
+    with_vacancy = [i for i in located if i.get("vacancy") is not None]
     for name, rows in (("points-penalized.json", penalized), ("points-all.json", located)):
         write(out / "data" / name, json.dumps(
             {"cols": ["lng", "lat", "n", "name", "url"],
              "rows": [point(i) for i in rows]}, ensure_ascii=False))
         files += 1
+    write(out / "data" / "points-vacancy.json", json.dumps(
+        {"cols": ["lng", "lat", "vacancy", "name", "url", "capacity", "enrolled"],
+         "rows": [vacancy_point(i) for i in with_vacancy]}, ensure_ascii=False))
+    files += 1
 
     # ---------- sitemap 與 robots ----------
     write(out / "sitemap.xml", env.get_template("sitemap.xml").render(urls=urls))
@@ -269,7 +279,9 @@ def main(argv: list[str]) -> int:
 
     log(f"產出 {files:,} 檔於 {out}：機構 {len(institutions):,}、"
         f"縣市 {len(city_cards)}、鄉鎮市區 {len(by_town)}；"
-        f"地圖點位 {len(penalized):,}／{len(located):,}")
+        f"地圖點位 {len(penalized):,}／{len(located):,}、"
+        f"缺額圖層 {len(with_vacancy):,}"
+        f"（有空位 {sum(1 for i in with_vacancy if i['vacancy'] > 0):,}）")
     if noindex:
         log("全站掛 noindex（6a）；6b 掛正式網域時加 --index")
 

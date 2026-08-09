@@ -39,7 +39,7 @@ PUBLIC = {
          "capacity_approved": 30, "enrolled": 25, "is_active": True,
          "penalty_count": 0, "last_penalty_date": None,
          "removed_penalty_count": 0, "archived_penalty_count": 0,
-         "recent_penalty_count": 0},
+         "recent_penalty_count": 0, "vacancy": 5},
     ]},
     "penalties.json": {"as_of": "2026-08-09", "records": [
         {"id": "ece:1", "source": "ece", "institution_id": "preschool:a",
@@ -84,6 +84,7 @@ def main():
                     "city/臺北市.html", "city/臺北市/中正區.html",
                     "city/新北市.html", "city/新北市/板橋區.html",
                     "data/points-penalized.json", "data/points-all.json",
+                    "data/points-vacancy.json",
                     "assets/style.css", "assets/leaflet.js"):
             assert (out / rel).exists(), f"缺少 {rel}"
         # 裁罰內嵌於機構頁，不另立頁（檔案數控制的關鍵）
@@ -126,6 +127,10 @@ def main():
         # 預設圖層只放近五年有裁罰者，點位帶的也是近五年件數
         assert len(pen["rows"]) == 1 and len(allp["rows"]) == 3
         assert pen["rows"][0][2] == 1
+        # 缺額圖層只收有實際收托數的托嬰中心
+        vac = json.loads((out / "data/points-vacancy.json").read_text())
+        assert len(vac["rows"]) == 1 and vac["rows"][0][2] == 5
+        assert "尚有 5 個空位" in (out / "i/babycare-CW1.html").read_text()
 
         # sitemap 收錄所有頁面且網址經過編碼
         sitemap = (out / "sitemap.xml").read_text()

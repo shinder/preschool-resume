@@ -23,6 +23,9 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* display:flex 之類會蓋掉 hidden 的預設值，統一補回 */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -97,6 +100,10 @@ a:hover { color: var(--seal); }
   background: var(--card); font-size: 0.8125rem; color: var(--ink-soft);
 }
 .mapbar label { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+.mapbar select {
+  font: inherit; font-size: 0.8125rem; color: var(--ink);
+  padding: 0.15rem 0.4rem; border: 1px solid var(--rule); background: var(--card);
+}
 #map { height: min(62vh, 34rem); border: 1px solid var(--rule); background: var(--field); }
 .leaflet-container { font-family: var(--sans); }
 
@@ -118,6 +125,13 @@ a:hover { color: var(--seal); }
 .marker-cluster-medium div { background: rgba(150, 44, 35, 0.9); }
 .marker-cluster-large { background: rgba(120, 34, 27, 0.2); }
 .marker-cluster-large div { background: rgba(120, 34, 27, 0.92); }
+
+/* 空位模式換靛藍：跟裁罰是兩種語意，不共用硃砂 */
+#map.mode-vacancy .marker-cluster { background: rgba(35, 78, 112, 0.18); }
+#map.mode-vacancy .marker-cluster div { background: rgba(35, 78, 112, 0.85); }
+#map.mode-vacancy .marker-cluster-medium div { background: rgba(28, 63, 91, 0.9); }
+#map.mode-vacancy .marker-cluster-large { background: rgba(22, 50, 72, 0.2); }
+#map.mode-vacancy .marker-cluster-large div { background: rgba(22, 50, 72, 0.92); }
 .leaflet-popup-content { font-size: 0.875rem; line-height: 1.6; }
 
 .legend { display: flex; gap: 1rem; margin-inline-start: auto; }
@@ -127,6 +141,7 @@ a:hover { color: var(--seal); }
 }
 .legend .has { background: var(--seal); }
 .legend .none { background: #9bb0bf; }
+.legend .open { background: var(--indigo); }
 
 /* ---------- 區段標題 ---------- */
 
@@ -168,6 +183,7 @@ a:hover { color: var(--seal); }
 }
 .badge.alert { background: var(--seal-soft); border-color: #e3bfba; color: var(--seal); font-weight: 600; }
 .badge.closed { background: #eceff1; color: #6b7a86; }
+.badge.open { background: var(--indigo-soft); border-color: #cddceb; color: var(--indigo); font-weight: 600; }
 .badge.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 /* 單欄時裁罰紀錄先出現——那是來訪者要找的東西，基本資料退到後面 */
