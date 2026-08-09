@@ -9,7 +9,7 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-from common import Fetcher, log, parse_args, save
+from common import Fetcher, log, parse_args, prune_stale_lists, save
 
 BASE = "https://crc.sfaa.gov.tw"
 LIST_URL = (
@@ -62,6 +62,7 @@ def crawl(data_dir: Path, delay: float, limit: int | None, new_only: bool = Fals
     # 逐頁抓列表，收集詳情 id
     ids: list[str] = []
     page = 1
+    complete = False
     while True:
         html = f.fetch(LIST_URL.format(page=page, pagesize=PAGESIZE))
         if html is None:
@@ -69,11 +70,15 @@ def crawl(data_dir: Path, delay: float, limit: int | None, new_only: bool = Fals
         found = DETAIL_RE.findall(html)
         new = [i for i in found if i not in ids]
         if not new:
+            complete = True
             break
         ids.extend(new)
         save(raw / "list" / f"p{page:04d}.html", html)
         log(f"列表第 {page} 頁：{len(new)} 筆（累計 {len(ids)}）")
         page += 1
+    if complete:
+        # 列表完整走完才整理；中途失敗時保留舊快照以免誤刪
+        prune_stale_lists(raw / "list", page - 1)
 
     # 逐筆抓詳情
     if new_only:

@@ -101,6 +101,22 @@ def save(path: Path, html: str) -> bool:
     return True
 
 
+def prune_stale_lists(list_dir: Path, last_page: int) -> None:
+    """刪除超過本次總頁數的舊列表快照。
+
+    總頁數縮減時（紀錄下架），若殘留舊的 pNNNN.html，解析器會把已下架
+    紀錄誤判為仍在線，removed 事件就永遠不會發生。
+    """
+    for p in list_dir.glob("p*.html"):
+        try:
+            n = int(p.stem[1:])
+        except ValueError:
+            continue
+        if n > last_page:
+            p.unlink()
+            log(f"移除過期列表快照：{p.name}")
+
+
 def safe_filename(name: str) -> str:
     return re.sub(r'[\\/:*?"<>|\s]+', "_", name.strip())
 

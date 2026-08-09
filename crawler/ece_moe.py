@@ -13,7 +13,8 @@ import re
 import sys
 from pathlib import Path
 
-from common import Fetcher, log, parse_args, safe_filename, save, strip_session_noise
+from common import (Fetcher, log, parse_args, prune_stale_lists, safe_filename,
+                    save, strip_session_noise)
 
 SEARCH_URL = "https://ap.ece.moe.edu.tw/webecems/punishSearch.aspx"
 DETAIL_URL = "https://ap.ece.moe.edu.tw/webecems/dtl/punish_view.aspx?sch={token}"
@@ -69,11 +70,15 @@ def crawl(data_dir: Path, delay: float, limit: int | None, new_only: bool = Fals
     page = 1
     changed = 0
     total = 0
+    last_saved = 0
+    complete = False
     while True:
         rows = [r for r in page_rows(html) if (r[0], r[1]) not in seen]
         if not rows and page > 1:
+            complete = True
             break
         save(raw / "list" / f"p{page:04d}.html", strip_session_noise(html))
+        last_saved = page
         for city, name, token in rows:
             seen.add((city, name))
             # 同名園所（極少數）依出現順序加序號，避免覆蓋
@@ -98,6 +103,7 @@ def crawl(data_dir: Path, delay: float, limit: int | None, new_only: bool = Fals
         log(f"列表第 {page} 頁：{len(rows)} 園（累計 {len(seen)}）")
 
         if NEXT_PAGE not in html:
+            complete = True
             break
         html = f.fetch(SEARCH_URL, data={
             **form_fields(html), "__EVENTTARGET": NEXT_PAGE, "__EVENTARGUMENT": "",
@@ -106,6 +112,9 @@ def crawl(data_dir: Path, delay: float, limit: int | None, new_only: bool = Fals
             break
         page += 1
 
+    if complete:
+        # 列表完整走完才整理過期快照；中途失敗時保留舊檔以免誤刪
+        prune_stale_lists(raw / "list", last_saved)
     log(f"完成：{page} 頁、詳情 {total} 筆（{changed} 筆有異動）、失敗 {len(f.failures)} 筆")
     return 2 if f.failures else 0
 
