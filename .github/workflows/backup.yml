@@ -60,16 +60,21 @@ jobs:
           echo "SFAA=$?" >> "$GITHUB_ENV"
           exit 0
 
-      - name: 提交資料 repo
+      - name: 提交資料 repo（含心跳檔，供 watchdog 檢查）
         run: |
+          mkdir -p data/status
+          printf '{"date": "%s", "exit": %d}\n' "$(TZ=Asia/Taipei date +%F)" "${SFAA:-1}" > data/status/sfaa_backup.json
           cd data
           git add -A
+          git config user.name "backup-bot"
+          git config user.email "shinder.lin@gmail.com"
           if git diff --cached --quiet; then
-            echo "本次無異動"
+            echo "無任何變更（同日重跑）"
+          elif git diff --cached --quiet -- . ':!status'; then
+            git commit -m "心跳 $(TZ=Asia/Taipei date +%F)（sfaa）"
+            git push
           else
-            git config user.name "backup-bot"
-            git config user.email "shinder.lin@gmail.com"
-            git commit -m "備份 $(date +%Y-%m-%d)（${{ steps.mode.outputs.mode }}）"
+            git commit -m "備份 $(TZ=Asia/Taipei date +%F)（${{ steps.mode.outputs.mode }}）"
             git push
           fi
 

@@ -31,9 +31,14 @@ python3 "$CODE_DIR/crawler/ece_moe.py" --data-dir "$DATA_DIR" $MODE_FLAG
 ECE=$?
 
 cd "$DATA_DIR" || exit 1
+mkdir -p status
+printf '{"date": "%s", "exit": %d}\n' "$(TZ=Asia/Taipei date +%F)" "$ECE" > status/ece_backup.json
 git add -A
 if git diff --cached --quiet; then
-  echo "本次無異動"
+  echo "無任何變更（同日重跑）"
+elif git diff --cached --quiet -- . ':!status'; then
+  git commit -q -m "心跳 $(TZ=Asia/Taipei date +%F)（ece）"
+  git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
 else
   git commit -q -m "備份 $(date +%Y-%m-%d)（ece ${MODE_NAME}）"
   git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"

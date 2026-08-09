@@ -25,19 +25,29 @@ git -C "$DATA_DIR" pull --rebase --quiet || echo "警告：data pull 失敗，�
 
 python3 "$CODE_DIR/crawler/diff.py" --data-dir "$DATA_DIR"
 RC=$?
+
+# 心跳檔一律寫入並推送（含失敗的 exit code），供 watchdog 檢查；
+# diff 產出（data/、events/）只在成功時 commit
+cd "$DATA_DIR" || exit 1
+mkdir -p status
+printf '{"date": "%s", "exit": %d}\n' "$(TZ=Asia/Taipei date +%F)" "$RC" > status/diff.json
+
 if [ $RC -ne 0 ]; then
-  echo "diff 引擎異常（exit=$RC），不 commit"
-  echo "===== 結束 diff exit=$RC ====="
-  exit $RC
+  echo "diff 引擎異常（exit=$RC），只推心跳不 commit 產出"
+  git add status
+else
+  git add data events status
 fi
 
-cd "$DATA_DIR" || exit 1
-git add data events
 if git diff --cached --quiet; then
-  echo "本次無事件"
+  echo "無任何變更（同日重跑）"
+elif git diff --cached --quiet -- . ':!status'; then
+  git commit -q -m "心跳 $(TZ=Asia/Taipei date +%F)（diff exit=$RC）"
+  git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
 else
   git commit -q -m "解析 $(date +%Y-%m-%d)：penalties 現況與事件"
   git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
 fi
 
-echo "===== 結束 diff exit=0 ====="
+echo "===== 結束 diff exit=$RC ====="
+exit $RC
