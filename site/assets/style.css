@@ -229,6 +229,11 @@ a:hover { color: var(--seal); }
 
 .townlist { display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; font-size: 0.875rem; }
 
+.refund { margin-top: 0.9rem; font-size: 0.875rem; color: var(--ink-soft); }
+.refund summary { cursor: pointer; color: var(--indigo); }
+.refund p { white-space: pre-wrap; margin: 0.6rem 0 0; padding: 0.9rem;
+  background: var(--card); border: 1px solid var(--rule); }
+
 .prose { max-width: 44rem; }
 .prose h2 { font-size: 1.0625rem; margin-top: 2rem; }
 .prose li { margin-bottom: 0.35rem; }

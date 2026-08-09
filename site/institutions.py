@@ -144,6 +144,43 @@ def build_preschool(features: list[dict], issues: list) -> list[dict]:
     return out
 
 
+def load_ncwis(data_dir: Path) -> dict[str, dict]:
+    """托嬰中心主檔（`crawler/ncwis_centers.py`）。沒有就退回只用 kiang 的投影。"""
+    path = data_dir / "data" / "ncwis" / "centers.json"
+    if not path.exists():
+        return {}
+    records = json.loads(path.read_text(encoding="utf-8"))["records"]
+    return {r["id"]: r for r in records}
+
+
+# ncwis 直接覆蓋的欄位：站方是權威來源，kiang 只是它的 8 欄投影
+NCWIS_OVERLAY = ("address", "phone", "capacity_approved", "enrolled", "owner")
+# ncwis 才有的欄位：機構頁的內容厚度靠這些
+NCWIS_EXTRA = ("grade", "grade_year", "area_total", "area_indoor", "area_outdoor",
+               "safety_public", "safety_fire", "staff", "fees", "fee_mode",
+               "refund_note", "note_name")
+
+
+def apply_ncwis(rec: dict, ncwis: dict, issues: list) -> dict:
+    """把 ncwis 的欄位疊上 kiang 的底稿。座標仍來自 kiang（站方不提供經緯度）。"""
+    rec["origin"] = "ncwis"
+    rec["geo_origin"] = "kiang"
+    for field in NCWIS_OVERLAY:
+        if (value := ncwis.get(field)) not in (None, ""):
+            rec[field] = value
+    for field in NCWIS_EXTRA:
+        rec[field] = ncwis.get(field)
+    # 準公共在兩本名冊語意不同：幼兒園是年度區間、托嬰是是／否
+    rec["pre_public"] = "是" if ncwis.get("pre_public") == "是" else None
+    if ncwis.get("address"):
+        m = ADDR_RE.match(ncwis["address"])
+        if m:
+            rec["postal_code"] = m.group("zip") or rec.get("postal_code")
+            rec["city"], rec["town"] = m.group("city"), m.group("town")
+            rec["address"] = ncwis["address"][len(m.group("zip") or ""):]
+    return rec
+
+
 def build_babycare(features: list[dict], issues: list) -> list[dict]:
     out = []
     for f in features:
@@ -181,11 +218,29 @@ def build_babycare(features: list[dict], issues: list) -> list[dict]:
             "enrolled": as_int(p.get("status")),             # 實際收托（上游快照時點）
             "is_active": bool(p.get("is_active")),
         })
+        if (extra := NCWIS.get(native_id)):
+            apply_ncwis(r, extra, issues)
+        out.append(r)
+
+    # ncwis 有、kiang 沒有的中心（kiang 以地理編碼失敗為由濾掉約 300 家，另有新立案者）：
+    # 一併收錄，只是沒有座標——列表與機構頁看得到，地圖上標不出來
+    seen = {r["native_id"] for r in out}
+    for cw, extra in sorted(NCWIS.items()):
+        if cw in seen:
+            continue
+        r = base_record("babycare", "sfaa", cw, extra["name"], None)
+        r.update({"city": None, "town": None, "postal_code": None,
+                  "is_active": True})
+        apply_ncwis(r, extra, issues)
+        # 已知的缺口而非資料異常，不計入品質門檻（gating=False）
+        issues.append({"id": r["id"], "name": r["name"], "gating": False,
+                       "issue": "無座標（ncwis 有、kiang 名冊沒有）"})
         out.append(r)
     return out
 
 
 BUILDERS = {"preschool": build_preschool, "babycare": build_babycare}
+NCWIS: dict[str, dict] = {}   # main() 載入後填入，供 build_babycare 使用
 
 
 def fetch_sources(raw_dir: Path, no_fetch: bool) -> dict[str, dict] | None:
@@ -247,6 +302,11 @@ def main(argv: list[str]) -> int:
     if got is None:
         return 1
 
+    global NCWIS
+    NCWIS = load_ncwis(data_dir)
+    if NCWIS:
+        log(f"托嬰中心主檔 {len(NCWIS):,} 家（crawler/ncwis_centers.py）")
+
     records, issues, counts = [], [], {}
     for kind, _source, _url, _filename in SOURCES:
         features = json.loads(got[kind]["path"].read_text(encoding="utf-8"))["features"]
@@ -261,9 +321,12 @@ def main(argv: list[str]) -> int:
         log(f"中止：機構 id 重複 {len(dups)} 筆，例：{dups[:5]}")
         return 1
 
-    # 品質門檻二：座標／地址缺漏率
-    rate = len(issues) / len(records) if records else 1.0
-    log(f"合計 {len(records):,} 家；資料問題 {len(issues)} 筆（{rate:.2%}）")
+    # 品質門檻二：座標／地址缺漏率（gating=False 的是已知缺口，不計入）
+    gating = [i for i in issues if i.get("gating", True)]
+    rate = len(gating) / len(records) if records else 1.0
+    known = len(issues) - len(gating)
+    log(f"合計 {len(records):,} 家；資料問題 {len(gating)} 筆（{rate:.2%}）"
+        + (f"，另有已知缺口 {known} 筆" if known else ""))
     for it in issues[:20]:
         log(f"  {it['id']} {it['name']}：{it['issue']}")
     if len(issues) > 20:

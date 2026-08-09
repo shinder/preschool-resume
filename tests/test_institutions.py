@@ -44,6 +44,27 @@ def babycare(n: int, *, address="231新北市新店區中央里中央一街20號
     }
 
 
+def ncwis(cw: str, name: str, **extra) -> dict:
+    return {"id": cw, "name": name, "address": "231新北市新店區中央一街20號1樓",
+            "phone": "02-11112222", "capacity_approved": 40, "enrolled": 33,
+            "owner": "陳美麗", "grade": "甲等", "grade_year": "114",
+            "pre_public": "是", "area_total": "300 平方公尺",
+            "area_indoor": "200 平方公尺", "area_outdoor": "100 平方公尺",
+            "safety_public": "核備文號:112-K5000480-01", "safety_fire": None,
+            "staff": {"主管人員": 1, "托育人員": 6}, "fee_mode": "日間托育",
+            "fees": [{"name": "托育費", "amount": "18000", "note": "月費"}],
+            "refund_note": "依定型化契約辦理。", "note_name": None,
+            "violations": [], **extra}
+
+
+def write_ncwis(d: Path, records: list[dict]):
+    p = d / "data" / "ncwis"
+    p.mkdir(parents=True, exist_ok=True)
+    (p / "centers.json").write_text(
+        json.dumps({"as_of": "2026-08-09", "records": records}, ensure_ascii=False),
+        encoding="utf-8")
+
+
 def write_sources(d: Path, pres: list[dict], babies: list[dict]):
     raw = d / "raw" / "kiang"
     raw.mkdir(parents=True, exist_ok=True)
@@ -101,6 +122,31 @@ def main():
         assert (b["city"], b["town"]) == ("新北市", "新店區"), b
         issues = json.loads((d / "data/institutions_issues.json").read_text())["issues"]
         assert len(issues) == 1 and "地址無法解析" in issues[0]["issue"], issues
+
+    # 二之二、ncwis 主檔覆蓋 kiang 底稿，並補進 kiang 名冊沒有的中心
+    with tempfile.TemporaryDirectory() as tmp:
+        d = Path(tmp)
+        write_sources(d, [preschool(1)], [babycare(1)])
+        write_ncwis(d, [ncwis("CW00000001", "新北市私立測試1托嬰中心"),
+                        ncwis("CW00000009", "新北市私立只在站方的托嬰中心")])
+        assert run(d) == 0
+        recs = load(d)
+
+        merged = recs["babycare:CW00000001"]
+        assert merged["origin"] == "ncwis" and merged["geo_origin"] == "kiang"
+        assert (merged["capacity_approved"], merged["enrolled"]) == (40, 33)  # 站方覆蓋
+        assert merged["lng"] is not None                    # 座標仍來自 kiang
+        assert merged["grade"] == "甲等" and merged["pre_public"] == "是"
+        assert merged["fees"][0]["amount"] == "18000"
+        assert merged["staff"]["托育人員"] == 6
+        assert merged["owner"] == "陳美麗"                   # 私有主檔留著供歸戶
+
+        # 站方有、kiang 沒有的中心照收，只是沒有座標
+        extra = recs["babycare:CW00000009"]
+        assert extra["lng"] is None and extra["city"] == "新北市"
+        # 這類缺口不計入品質門檻，否則約 300 家會直接讓建置失敗
+        issues = json.loads((d / "data/institutions_issues.json").read_text())["issues"]
+        assert [i["gating"] for i in issues] == [False], issues
 
     # 三、問題率超過門檻即中止（座標落在台灣範圍外）
     with tempfile.TemporaryDirectory() as tmp:

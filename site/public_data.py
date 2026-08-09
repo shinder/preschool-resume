@@ -35,6 +35,9 @@ INSTITUTION_FIELDS = (
     "address", "lng", "lat", "phone", "url", "org_type", "capacity_approved",
     "enrolled", "pre_public", "free5", "after_school", "shuttle", "monthly_fee",
     "floor", "area_indoor", "area_outdoor", "reg_no", "reg_date", "is_active",
+    # 托嬰中心主檔（ncwis）才有的欄位。負責人姓名（owner）刻意不在此列。
+    "grade", "grade_year", "area_total", "safety_public", "safety_fire",
+    "staff", "fees", "fee_mode", "refund_note", "note_name",
 )
 PENALTY_FIELDS = (
     "id", "source", "institution_id", "city", "area", "doc_no", "law",
@@ -99,6 +102,11 @@ def pick(record: dict, fields: tuple, names: set[str] | None = None) -> dict:
         for f, v in out.items():
             if isinstance(v, str):
                 out[f] = mask_text(v, names)
+            elif isinstance(v, list):   # 如收費明細，逐項的字串也要遮
+                out[f] = [{k: mask_text(x, names) if isinstance(x, str) else x
+                           for k, x in item.items()} if isinstance(item, dict)
+                          else mask_text(item, names) if isinstance(item, str) else item
+                          for item in v]
     return out
 
 

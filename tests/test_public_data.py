@@ -21,7 +21,9 @@ INSTITUTIONS = [
     {"id": "babycare:CW1", "kind": "babycare", "source": "sfaa", "native_id": "CW1",
      "name": "新北市私立乙托嬰中心", "city": "新北市", "town": "板橋區",
      "address": "新北市板橋區測試路2號", "lng": 121.4, "lat": 25.0,
-     "capacity_approved": 30, "enrolled": 25, "is_active": True, "owner": "李小美"},
+     "capacity_approved": 30, "enrolled": 25, "is_active": True, "owner": "李小美",
+     "grade": "甲等", "grade_year": "114", "staff": {"托育人員": 6},
+     "fees": [{"name": "托育費", "amount": "18000", "note": "洽負責人李小美"}]},
 ]
 
 PENALTIES = {
@@ -125,6 +127,10 @@ def main():
 
         # 白名單：私有欄位不得出現
         assert "owner" not in insts["preschool:a"]
+        # ncwis 帶來的欄位要進公開層，但巢狀結構裡的姓名同樣要遮
+        baby = insts["babycare:CW1"]
+        assert baby["grade"] == "甲等" and baby["staff"]["托育人員"] == 6
+        assert baby["fees"][0]["note"] == "洽負責人李○○", baby["fees"]
         assert not ({"person", "targets", "files", "school"} & set(pens["ece:1"])), pens["ece:1"]
 
         # 自然人裁罰整筆不進公開層

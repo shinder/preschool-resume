@@ -33,7 +33,10 @@
       <span class="badge alert num">{{ archived_count }} 筆官方已無</span>
       {%- endif %}
       {%- if inst.pre_public and inst.pre_public != "無" %}
-      <span class="badge">準公共 {{ inst.pre_public }}</span>
+      <span class="badge">{{ "準公共" if inst.pre_public == "是" else "準公共 " ~ inst.pre_public }}</span>
+      {%- endif %}
+      {%- if inst.grade %}
+      <span class="badge">評鑑{{ inst.grade }}{% if inst.grade_year %}（{{ inst.grade_year }} 年度）{% endif %}</span>
       {%- endif %}
     </div>
   </header>
@@ -57,8 +60,16 @@
           {%- if inst.free5 %}<tr><th>五歲免學費</th><td>{{ inst.free5 }}</td></tr>{% endif %}
           {%- if inst.after_school %}<tr><th>課後留園</th><td>{{ inst.after_school }}</td></tr>{% endif %}
           {%- if inst.shuttle %}<tr><th>幼童專用車</th><td>{{ inst.shuttle }}</td></tr>{% endif %}
+          {%- if inst.area_total %}<tr><th>總面積</th><td class="num">{{ inst.area_total }}</td></tr>{% endif %}
           {%- if inst.area_indoor %}<tr><th>室內面積</th><td class="num">{{ inst.area_indoor }}</td></tr>{% endif %}
           {%- if inst.area_outdoor %}<tr><th>室外面積</th><td class="num">{{ inst.area_outdoor }}</td></tr>{% endif %}
+          {%- if inst.staff %}
+          <tr><th>核備人員</th><td>
+            {%- for role, n in inst.staff.items() %}{% if n %}{{ role }} <span class="num">{{ n }}</span> 人{% if not loop.last %}、{% endif %}{% endif %}{% endfor %}
+          </td></tr>
+          {%- endif %}
+          {%- if inst.safety_public %}<tr><th>公共安全</th><td class="num">{{ inst.safety_public }}</td></tr>{% endif %}
+          {%- if inst.safety_fire %}<tr><th>消防安全</th><td class="num">{{ inst.safety_fire }}</td></tr>{% endif %}
           {%- if inst.floor %}<tr><th>使用樓層</th><td>{{ inst.floor }}</td></tr>{% endif %}
           {%- if inst.reg_no %}<tr><th>立案文號</th><td class="num">{{ inst.reg_no }}</td></tr>{% endif %}
           {%- if inst.reg_date %}<tr><th>立案日期</th><td class="num">{{ inst.reg_date }}</td></tr>{% endif %}
@@ -112,6 +123,31 @@
         <p class="empty">目前查無裁罰紀錄。本站收錄自 {{ coverage_from }} 起的公告，含官方已下架者。</p>
         {%- endif %}
       </section>
+
+      {%- if inst.fees %}
+      <section class="section">
+        <h2>收費情形{% if inst.fee_mode %}（{{ inst.fee_mode }}）{% endif %}</h2>
+        <table class="roster">
+          <caption>主管機關備查金額，實際收費以園所公告為準。</caption>
+          <thead><tr><th>費用名稱</th><th>金額</th><th>說明</th></tr></thead>
+          <tbody>
+            {%- for fee in inst.fees %}
+            <tr>
+              <td>{{ fee.name or "—" }}</td>
+              <td class="num">{{ "{:,}".format(fee.amount|int) if fee.amount and fee.amount.isdigit() else (fee.amount or "—") }}</td>
+              <td>{{ fee.note or "" }}</td>
+            </tr>
+            {%- endfor %}
+          </tbody>
+        </table>
+        {%- if inst.refund_note %}
+        <details class="refund">
+          <summary>退費說明</summary>
+          <p>{{ inst.refund_note }}</p>
+        </details>
+        {%- endif %}
+      </section>
+      {%- endif %}
 
       {%- if neighbours %}
       <section class="section">
