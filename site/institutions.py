@@ -144,13 +144,16 @@ def build_preschool(features: list[dict], issues: list) -> list[dict]:
     return out
 
 
-def load_ncwis(data_dir: Path) -> dict[str, dict]:
-    """托嬰中心主檔（`crawler/ncwis_centers.py`）。沒有就退回只用 kiang 的投影。"""
+def load_ncwis(data_dir: Path) -> tuple[dict[str, dict], str | None]:
+    """托嬰中心主檔（`crawler/ncwis_centers.py`）。沒有就退回只用 kiang 的投影。
+
+    一併回傳主檔的資料日期：實際收托是站方回報值、非即時，缺額必須標時點。
+    """
     path = data_dir / "data" / "ncwis" / "centers.json"
     if not path.exists():
-        return {}
-    records = json.loads(path.read_text(encoding="utf-8"))["records"]
-    return {r["id"]: r for r in records}
+        return {}, None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return {r["id"]: r for r in payload["records"]}, payload.get("as_of")
 
 
 # ncwis 直接覆蓋的欄位：站方是權威來源，kiang 只是它的 8 欄投影
@@ -168,6 +171,7 @@ def apply_ncwis(rec: dict, ncwis: dict, issues: list) -> dict:
     與站方標記差距逾 500 公尺，站方自己標的才是權威值。
     """
     rec["origin"] = "ncwis"
+    rec["enrolled_as_of"] = NCWIS_AS_OF
     if ncwis.get("lat") is not None:
         rec["lat"], rec["lng"] = ncwis["lat"], ncwis["lng"]
         rec["geo_origin"] = "ncwis"
@@ -253,6 +257,7 @@ def build_babycare(features: list[dict], issues: list) -> list[dict]:
 
 BUILDERS = {"preschool": build_preschool, "babycare": build_babycare}
 NCWIS: dict[str, dict] = {}   # main() 載入後填入，供 build_babycare 使用
+NCWIS_AS_OF: str | None = None
 
 
 def fetch_sources(raw_dir: Path, no_fetch: bool) -> dict[str, dict] | None:
@@ -314,8 +319,8 @@ def main(argv: list[str]) -> int:
     if got is None:
         return 1
 
-    global NCWIS
-    NCWIS = load_ncwis(data_dir)
+    global NCWIS, NCWIS_AS_OF
+    NCWIS, NCWIS_AS_OF = load_ncwis(data_dir)
     if NCWIS:
         log(f"托嬰中心主檔 {len(NCWIS):,} 家（crawler/ncwis_centers.py）")
 

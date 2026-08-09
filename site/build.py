@@ -243,7 +243,8 @@ def main(argv: list[str]) -> int:
 
     def vacancy_point(inst):
         return [inst["lng"], inst["lat"], inst["vacancy"], inst["name"],
-                href(inst_path(inst)), inst["capacity_approved"], inst["enrolled"]]
+                href(inst_path(inst)), inst["capacity_approved"], inst["enrolled"],
+                inst.get("enrolled_as_of")]
 
     located = [i for i in institutions if i.get("lng") is not None]
     # 地圖預設只標近五年——一筆多年前的舊紀錄不該讓機構永遠是紅點
@@ -256,7 +257,8 @@ def main(argv: list[str]) -> int:
              "rows": [point(i) for i in rows]}, ensure_ascii=False))
         files += 1
     write(out / "data" / "points-vacancy.json", json.dumps(
-        {"cols": ["lng", "lat", "vacancy", "name", "url", "capacity", "enrolled"],
+        {"cols": ["lng", "lat", "vacancy", "name", "url", "capacity", "enrolled",
+                  "as_of"],
          "rows": [vacancy_point(i) for i in with_vacancy]}, ensure_ascii=False))
     files += 1
 

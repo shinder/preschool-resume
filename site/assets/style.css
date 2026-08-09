@@ -204,6 +204,7 @@ a:hover { color: var(--seal); }
 .facts th, .facts td { text-align: start; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
 .facts th { width: 6.5rem; font-weight: 500; color: var(--ink-soft); }
 .facts td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.facts .asof { font-size: 0.75rem; color: var(--ink-soft); }
 
 /* Signature：裁罰卷宗條目 */
 .ledger { display: grid; gap: 0.9rem; }

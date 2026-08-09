@@ -37,7 +37,7 @@ INSTITUTION_FIELDS = (
     "floor", "area_indoor", "area_outdoor", "reg_no", "reg_date", "is_active",
     # 托嬰中心主檔（ncwis）才有的欄位。負責人姓名（owner）刻意不在此列。
     "grade", "grade_year", "area_total", "safety_public", "safety_fire",
-    "staff", "fees", "fee_mode", "refund_note", "note_name",
+    "staff", "fees", "fee_mode", "refund_note", "note_name", "enrolled_as_of",
 )
 PENALTY_FIELDS = (
     "id", "source", "institution_id", "city", "area", "doc_no", "law",

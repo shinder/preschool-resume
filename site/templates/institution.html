@@ -40,7 +40,7 @@
       {%- endif %}
       {%- if inst.vacancy is defined and inst.vacancy is not none %}
       <span class="badge num{{ ' open' if inst.vacancy > 0 else '' }}">
-        {{- "尚有 " ~ inst.vacancy ~ " 個空位" if inst.vacancy > 0 else "已額滿" -}}
+        {{- "約 " ~ inst.vacancy ~ " 個空位" if inst.vacancy > 0 else "已額滿" -}}
       </span>
       {%- endif %}
       {%- if inst.grade %}
@@ -65,8 +65,9 @@
           <tr><th>實際收托</th><td class="num">{{ inst.enrolled }} 人</td></tr>
           {%- endif %}
           {%- if inst.vacancy is defined and inst.vacancy is not none %}
-          <tr><th>目前空位</th><td class="num">
-            {{- "尚有 " ~ inst.vacancy ~ " 個空位" if inst.vacancy > 0 else "已額滿" -}}
+          <tr><th>空位</th><td class="num">
+            {{- "約 " ~ inst.vacancy ~ " 個" if inst.vacancy > 0 else "已額滿" }}
+            {%- if inst.enrolled_as_of %}<br><span class="asof">依 {{ inst.enrolled_as_of }} 名冊</span>{% endif %}
           </td></tr>
           {%- endif %}
           {%- if inst.monthly_fee %}<tr><th>月費參考</th><td class="num">{{ "{:,}".format(inst.monthly_fee) }} 元</td></tr>{% endif %}

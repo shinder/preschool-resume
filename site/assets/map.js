@@ -103,8 +103,10 @@
     var full = group("cluster-full");
     rows.forEach(function (row) {
       var v = row[2];
-      var label = (v > 0 ? "尚有 " + v + " 個空位" : "已額滿") +
-                  "<br>核定 " + row[5] + " 人／實際 " + row[6] + " 人";
+      // 實際收托是站方回報值、非即時，標明時點免得家長照著撲空
+      var label = (v > 0 ? "約 " + v + " 個空位" : "已額滿") +
+                  "<br>核定 " + row[5] + " 人／實際 " + row[6] + " 人" +
+                  (row[7] ? "（依 " + row[7] + " 名冊）" : "");
       if (v > 0) {
         vacant.addLayer(marker(row, STYLES.vacant, Math.min(4 + v / 3, 11), label));
       } else {

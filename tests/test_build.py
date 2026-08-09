@@ -130,7 +130,7 @@ def main():
         # 缺額圖層只收有實際收托數的托嬰中心
         vac = json.loads((out / "data/points-vacancy.json").read_text())
         assert len(vac["rows"]) == 1 and vac["rows"][0][2] == 5
-        assert "尚有 5 個空位" in (out / "i/babycare-CW1.html").read_text()
+        assert "約 5 個" in (out / "i/babycare-CW1.html").read_text()
 
         # sitemap 收錄所有頁面且網址經過編碼
         sitemap = (out / "sitemap.xml").read_text()
