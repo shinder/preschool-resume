@@ -33,7 +33,7 @@
     vacancy: document.getElementById("legend-vacancy"),
   };
 
-  var RADIUS = 6;
+  var RADIUS = 8;
   var STYLES = {
     penalty: { color: "#b23a2f", fill: "#b23a2f", opacity: 0.8, weight: 1 },
     clean: { color: "#2e9e5b", fill: "#2e9e5b", opacity: 0.4, weight: 2 },
