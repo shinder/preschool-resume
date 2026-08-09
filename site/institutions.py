@@ -162,9 +162,17 @@ NCWIS_EXTRA = ("grade", "grade_year", "area_total", "area_indoor", "area_outdoor
 
 
 def apply_ncwis(rec: dict, ncwis: dict, issues: list) -> dict:
-    """把 ncwis 的欄位疊上 kiang 的底稿。座標仍來自 kiang（站方不提供經緯度）。"""
+    """把 ncwis 的欄位疊上 kiang 的底稿。
+
+    座標優先用站方地圖標記反算的值——kiang 有 6% 是自行地理編碼的結果，
+    與站方標記差距逾 500 公尺，站方自己標的才是權威值。
+    """
     rec["origin"] = "ncwis"
-    rec["geo_origin"] = "kiang"
+    if ncwis.get("lat") is not None:
+        rec["lat"], rec["lng"] = ncwis["lat"], ncwis["lng"]
+        rec["geo_origin"] = "ncwis"
+    else:
+        rec["geo_origin"] = "kiang" if rec.get("lat") is not None else None
     for field in NCWIS_OVERLAY:
         if (value := ncwis.get(field)) not in (None, ""):
             rec[field] = value
@@ -220,6 +228,9 @@ def build_babycare(features: list[dict], issues: list) -> list[dict]:
         })
         if (extra := NCWIS.get(native_id)):
             apply_ncwis(r, extra, issues)
+        else:
+            # 站方名冊已無（多為停辦），只剩 kiang 的紀錄
+            r["geo_origin"] = "kiang" if r.get("lat") is not None else None
         out.append(r)
 
     # ncwis 有、kiang 沒有的中心（kiang 以地理編碼失敗為由濾掉約 300 家，另有新立案者）：
@@ -232,9 +243,10 @@ def build_babycare(features: list[dict], issues: list) -> list[dict]:
         r.update({"city": None, "town": None, "postal_code": None,
                   "is_active": True})
         apply_ncwis(r, extra, issues)
-        # 已知的缺口而非資料異常，不計入品質門檻（gating=False）
-        issues.append({"id": r["id"], "name": r["name"], "gating": False,
-                       "issue": "無座標（ncwis 有、kiang 名冊沒有）"})
+        if r.get("lat") is None:
+            # 已知的缺口而非資料異常，不計入品質門檻（gating=False）
+            issues.append({"id": r["id"], "name": r["name"], "gating": False,
+                           "issue": "無座標（站方地圖標記為空）"})
         out.append(r)
     return out
 

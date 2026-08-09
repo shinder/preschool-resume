@@ -13,7 +13,10 @@
 - `cityId` 不會過濾（送了仍回全域結果），`townId` 會。且全域查詢有 **300 筆上限**，
   故以鄉鎮市區為分割單位列舉，每區筆數遠低於上限。
 - 結果頁的地圖標記把該區全部 CW 編號都寫在 HTML 裡，不必逐頁翻。
-- 站方不提供經緯度（kiang 是自行以 NLSC MapSearch 地理編碼），本爬蟲同樣不產座標。
+- **座標也在結果頁的地圖標記裡**（`var x/var y`，TWD97 二度分帶 EPSG:3826），
+  站方只是沒有直接寫成經緯度。反算後與 kiang 的既有座標中位差 0.0 公尺、
+  90% 在 75 公尺內；差距大的那 6% 是他改用 NLSC 地理編碼的部分，站方自己的
+  標記才是權威值。所以不需要 TGOS 也不需要 NLSC，本爬蟲自帶座標。
 
 低頻批次（機構主檔月更即可），不進每日排程，因此不寫心跳檔、不納入 watchdog。
 教保網封鎖境外 IP 的問題此站未測，預設在 old-mini 執行最保險。
@@ -25,6 +28,7 @@
 """
 
 import json
+import math
 import re
 import sys
 from datetime import date
@@ -47,7 +51,8 @@ TOTAL_RE = re.compile(r"共\s*<span[^>]*>\s*(\d+)\s*</span>\s*筆")
 
 NAME_RE = re.compile(r'<div class="cell">機構名稱<span>\s*(.*?)\s*</span>')
 ROW_RE = re.compile(r'<span class="tag">\s*(.*?)\s*</span>(.*?)(?=<div class="data-row|</div>\s*</div>)', re.S)
-STAFF_RE = re.compile(r'<div class="d-inline-block[^"]*">\s*(.*?)\s*(\d+)\s*人\s*</div>')
+# 不要求收尾的 </div>：區塊尾端的 </div> 可能已被 ROW_RE 的界線切掉
+STAFF_RE = re.compile(r'<div class="d-inline-block[^"]*">\s*(.*?)\s*(\d+)\s*人')
 FEE_MODE_RE = re.compile(r'<p class="h6">托育方式：\s*(.*?)\s*</p>')
 FEE_CELL_RE = re.compile(r'<td[^>]*data-label="([^"｜]*)[^"]*">\s*(.*?)\s*</td>', re.S)
 TAG_RE = re.compile(r"<[^>]+>")
@@ -77,8 +82,63 @@ FIELDS = {
 NUMERIC = {"capacity_approved", "enrolled"}
 
 
+# 地圖標記：座標與該筆的詳情連結相鄰，限制間距避免跨筆錯配
+MARKER_RE = re.compile(
+    r"var x = '([\d.]+)';\s*var y = '([\d.]+)';.{0,600}?detail/(CW\d+)", re.S)
+# 站方全台一律用 TWD97 二度分帶、中央經線 121（離島亦同，已實測確認）
+TM2_LON0 = 121.0
+TW_BBOX = (118.0, 21.5, 122.2, 26.5)
+
+
 def text(html: str) -> str:
     return re.sub(r"\s+", " ", TAG_RE.sub(" ", html)).strip()
+
+
+def tm2_to_wgs84(x: float, y: float) -> tuple[float, float]:
+    """TWD97 二度分帶（EPSG:3826）→ WGS84 經緯度。橫麥卡托反算，零依賴。"""
+    a, f = 6378137.0, 1 / 298.257222101       # GRS80
+    k0, false_easting = 0.9999, 250000.0
+    e2 = 2 * f - f * f
+    ep2 = e2 / (1 - e2)
+    x -= false_easting
+    mu = (y / k0) / (a * (1 - e2 / 4 - 3 * e2**2 / 64 - 5 * e2**3 / 256))
+    e1 = (1 - math.sqrt(1 - e2)) / (1 + math.sqrt(1 - e2))
+    phi = (mu + (3 * e1 / 2 - 27 * e1**3 / 32) * math.sin(2 * mu)
+           + (21 * e1**2 / 16 - 55 * e1**4 / 32) * math.sin(4 * mu)
+           + (151 * e1**3 / 96) * math.sin(6 * mu)
+           + (1097 * e1**4 / 512) * math.sin(8 * mu))
+    c1 = ep2 * math.cos(phi) ** 2
+    t1 = math.tan(phi) ** 2
+    n1 = a / math.sqrt(1 - e2 * math.sin(phi) ** 2)
+    r1 = a * (1 - e2) / (1 - e2 * math.sin(phi) ** 2) ** 1.5
+    d = x / (n1 * k0)
+    lat = phi - (n1 * math.tan(phi) / r1) * (
+        d**2 / 2 - (5 + 3 * t1 + 10 * c1 - 4 * c1**2 - 9 * ep2) * d**4 / 24
+        + (61 + 90 * t1 + 298 * c1 + 45 * t1**2 - 252 * ep2 - 3 * c1**2) * d**6 / 720)
+    lon = math.radians(TM2_LON0) + (
+        d - (1 + 2 * t1 + c1) * d**3 / 6
+        + (5 - 2 * c1 + 28 * t1 - 3 * c1**2 + 8 * ep2 + 24 * t1**2) * d**5 / 120
+    ) / math.cos(phi)
+    return math.degrees(lat), math.degrees(lon)
+
+
+def collect_coords(data_dir: Path) -> tuple[dict[str, tuple[float, float]], int]:
+    """從列表快照抽出各中心的地圖標記座標。回傳（座標表, 站方為 0 或超出範圍的筆數）。"""
+    coords, bad = {}, 0
+    for path in sorted((data_dir / "raw" / "ncwis" / "list").glob("*.html")):
+        html = path.read_text(encoding="utf-8")
+        for sx, sy, cw in MARKER_RE.findall(html):
+            x, y = float(sx), float(sy)
+            if not x or not y:      # 站方自己就沒有座標
+                bad += 1
+                continue
+            lat, lng = tm2_to_wgs84(x, y)
+            x0, y0, x1, y1 = TW_BBOX
+            if not (x0 <= lng <= x1 and y0 <= lat <= y1):
+                bad += 1
+                continue
+            coords[cw] = (round(lat, 6), round(lng, 6))
+    return coords, bad
 
 
 def strip_csrf(html: str) -> str:
@@ -232,6 +292,7 @@ def main(argv: list[str]) -> int:
         if fetcher.failures:
             log(f"抓取失敗 {len(fetcher.failures)} 筆")
 
+    coords, bad_coords = collect_coords(data_dir)
     records, failures = [], []
     for cw in sorted(ids):
         path = detail_dir / f"{cw}.html"
@@ -240,6 +301,7 @@ def main(argv: list[str]) -> int:
             continue
         rec = parse_detail(path.read_text(encoding="utf-8"), cw, failures)
         if rec:
+            rec["lat"], rec["lng"] = coords.get(cw, (None, None))
             records.append(rec)
 
     out = data_dir / "data" / "ncwis" / "centers.json"
@@ -248,8 +310,10 @@ def main(argv: list[str]) -> int:
                               ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     graded = sum(1 for r in records if r.get("grade"))
     fees = sum(1 for r in records if r.get("fees"))
+    located = sum(1 for r in records if r.get("lat") is not None)
     log(f"解析 {len(records):,} 家 → {out}"
-        f"（有評鑑等級 {graded:,}、有收費明細 {fees:,}）")
+        f"（有評鑑等級 {graded:,}、有收費明細 {fees:,}、有座標 {located:,}"
+        + (f"，站方無座標 {bad_coords}" if bad_coords else "") + "）")
     if failures:
         for f in failures[:10]:
             log(f"  {f}")
