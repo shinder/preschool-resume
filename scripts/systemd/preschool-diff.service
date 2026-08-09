@@ -1,0 +1,13 @@
+# 裁罰解析＋diff 事件產出（部署於 old-mini）
+# 安裝：sudo cp scripts/systemd/preschool-diff.* /etc/systemd/system/
+#       sudo systemctl daemon-reload && sudo systemctl enable --now preschool-diff.timer
+[Unit]
+Description=幼兒園裁罰解析與異動事件產出
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=shinder
+ExecStart=/bin/bash /home/shinder/preschool-resume/scripts/local_diff.sh
+TimeoutStartSec=1h
