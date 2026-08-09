@@ -128,6 +128,8 @@ def main(argv: list[str]) -> int:
     aliases = load("aliases.json", "aliases")
     meta = json.loads((public / "meta.json").read_text(encoding="utf-8"))
     as_of = meta["as_of"]
+    recent_since = meta.get("recent_since", "0000-00-00")
+    env_recent_years = meta.get("recent_years", 5)
 
     by_inst = defaultdict(list)
     for p in penalties:
@@ -148,7 +150,8 @@ def main(argv: list[str]) -> int:
     env = Environment(loader=FileSystemLoader(repo / "site" / "templates"),
                       autoescape=select_autoescape(["html", "xml"]),
                       trim_blocks=True, lstrip_blocks=True)
-    env.globals.update(as_of=as_of, noindex=noindex, base_url=base_url)
+    env.globals.update(as_of=as_of, noindex=noindex, base_url=base_url,
+                       recent_since=recent_since, recent_years=env_recent_years)
 
     # ---------- 索引：縣市／鄉鎮市區 ----------
     by_city, by_town = defaultdict(list), defaultdict(list)
@@ -156,6 +159,7 @@ def main(argv: list[str]) -> int:
     for inst in institutions:
         row = {"name": inst["name"], "kind": inst["kind"], "town": inst.get("town"),
                "url": href(inst_path(inst)), "penalty_count": inst["penalty_count"],
+               "recent_penalty_count": inst.get("recent_penalty_count", 0),
                "last_penalty_date": inst.get("last_penalty_date"),
                "is_active": inst.get("is_active", True)}
         rows_by_id[inst["id"]] = row
@@ -164,7 +168,8 @@ def main(argv: list[str]) -> int:
             by_town[(inst["city"] or "未分類", inst["town"])].append(row)
 
     def order(rows):
-        return sorted(rows, key=lambda r: (-(r["penalty_count"] or 0), r["name"]))
+        return sorted(rows, key=lambda r: (-(r["recent_penalty_count"] or 0),
+                                           -(r["penalty_count"] or 0), r["name"]))
 
     urls = [{"path": "/", "priority": "1.0"}, {"path": "/about.html"}]
     files = 0
@@ -176,10 +181,14 @@ def main(argv: list[str]) -> int:
         url = base_url + href(path)
         rows = by_inst.get(inst["id"], [])
         entries = [{**p, "archived": bool(p.get("removed_at"))} for p in rows]
+        # 近五年預設展開，更早的收合——保留但不佔滿版面（見公開層 RECENT_YEARS）
+        recent = [e for e in entries if (e.get("penalty_date") or "") >= recent_since]
+        older = [e for e in entries if (e.get("penalty_date") or "") < recent_since]
         siblings = [r for r in by_town.get((inst["city"], inst.get("town")), [])
                     if r["url"] != href(path) and r["kind"] == inst["kind"]]
         html = env.get_template("institution.html").render(
-            inst=inst, penalties=entries, aliases=alias_by_inst.get(inst["id"], []),
+            inst=inst, penalties=recent, older=older,
+            aliases=alias_by_inst.get(inst["id"], []),
             archived_count=sum(1 for p in entries if p["archived"]),
             city_url=href(city_path(inst["city"])) if inst.get("city") else "/",
             town_url=href(town_path(inst["city"], inst["town"])) if inst.get("town") else None,
@@ -199,21 +208,22 @@ def main(argv: list[str]) -> int:
     listing = env.get_template("listing.html")
     for city, rows in sorted(by_city.items()):
         towns = [{"name": town, "url": href(town_path(city, town)),
-                  "penalized": sum(1 for r in trows if r["penalty_count"])}
+                  "penalized": sum(1 for r in trows if r["recent_penalty_count"])}
                  for (c, town), trows in sorted(by_town.items()) if c == city]
         html = listing.render(heading=city, rows=order(rows), towns=towns, parent=None,
-                              penalized=sum(1 for r in rows if r["penalty_count"]))
+                              penalized=sum(1 for r in rows if r["recent_penalty_count"]))
         write(out / city_path(city).lstrip("/"), html)
         files += 1
         urls.append({"path": href(city_path(city)), "priority": "0.6"})
         city_cards.append({"name": city, "url": href(city_path(city)),
                            "total": len(rows),
-                           "penalized": sum(1 for r in rows if r["penalty_count"])})
+                           "penalized": sum(1 for r in rows
+                                            if r["recent_penalty_count"])})
 
     for (city, town), rows in sorted(by_town.items()):
         html = listing.render(heading=f"{city}{town}", rows=order(rows), towns=None,
                               parent={"name": city, "url": href(city_path(city))},
-                              penalized=sum(1 for r in rows if r["penalty_count"]))
+                              penalized=sum(1 for r in rows if r["recent_penalty_count"]))
         write(out / town_path(city, town).lstrip("/"), html)
         files += 1
         urls.append({"path": href(town_path(city, town)), "priority": "0.5"})
@@ -228,11 +238,12 @@ def main(argv: list[str]) -> int:
 
     # ---------- 地圖點位 ----------
     def point(inst):
-        return [inst["lng"], inst["lat"], inst["penalty_count"], inst["name"],
-                href(inst_path(inst))]
+        return [inst["lng"], inst["lat"], inst.get("recent_penalty_count", 0),
+                inst["name"], href(inst_path(inst))]
 
     located = [i for i in institutions if i.get("lng") is not None]
-    penalized = [i for i in located if i["penalty_count"]]
+    # 地圖預設只標近五年——一筆多年前的舊紀錄不該讓機構永遠是紅點
+    penalized = [i for i in located if i.get("recent_penalty_count")]
     for name, rows in (("points-penalized.json", penalized), ("points-all.json", located)):
         write(out / "data" / name, json.dumps(
             {"cols": ["lng", "lat", "n", "name", "url"],

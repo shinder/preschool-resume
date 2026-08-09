@@ -1,0 +1,186 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "幼兒園履歷" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e5]: 幼兒園與托嬰中心的公開紀錄
+      - navigation [ref=e6]:
+        - link "地圖" [ref=e7] [cursor=pointer]:
+          - /url: /
+        - link "關於這個站" [ref=e8] [cursor=pointer]:
+          - /url: /about.html
+  - main [ref=e9]:
+    - generic [ref=e10]:
+      - paragraph [ref=e11]:
+        - link "全台" [ref=e12] [cursor=pointer]:
+          - /url: /
+        - text: ／
+        - link "新竹縣" [ref=e13] [cursor=pointer]:
+          - /url: /city/%E6%96%B0%E7%AB%B9%E7%B8%A3.html
+        - text: ／
+        - link "湖口鄉" [ref=e14] [cursor=pointer]:
+          - /url: /city/%E6%96%B0%E7%AB%B9%E7%B8%A3/%E6%B9%96%E5%8F%A3%E9%84%89.html
+      - generic [ref=e15]:
+        - heading "新竹縣私立英格蘭幼兒園" [level=1] [ref=e16]
+        - generic [ref=e17]:
+          - generic [ref=e18]: 幼兒園
+          - generic [ref=e19]: 私立
+          - generic [ref=e20]: 近 5 年 3 筆裁罰
+          - generic [ref=e21]: 更早 52 筆
+          - generic [ref=e22]: 官方已無 51 筆
+      - generic [ref=e23]:
+        - complementary [ref=e24]:
+          - table [ref=e25]:
+            - caption
+            - rowgroup [ref=e26]:
+              - row "地址 新竹縣湖口鄉成功路454巷45弄7號 在地圖上開啟" [ref=e27]:
+                - rowheader "地址" [ref=e28]
+                - cell "新竹縣湖口鄉成功路454巷45弄7號 在地圖上開啟" [ref=e29]:
+                  - text: 新竹縣湖口鄉成功路454巷45弄7號
+                  - link "在地圖上開啟" [ref=e30] [cursor=pointer]:
+                    - /url: https://www.google.com/maps/search/?api=1&query=%E6%96%B0%E7%AB%B9%E7%B8%A3%E6%B9%96%E5%8F%A3%E9%84%89%E6%88%90%E5%8A%9F%E8%B7%AF454%E5%B7%B745%E5%BC%847%E8%99%9F
+              - row "電話 (03)5999993" [ref=e31]:
+                - rowheader "電話" [ref=e32]
+                - cell "(03)5999993" [ref=e33]
+              - row "核定人數 46 人" [ref=e34]:
+                - rowheader "核定人數" [ref=e35]
+                - cell "46 人" [ref=e36]
+              - row "月費參考 10,000 元" [ref=e37]:
+                - rowheader "月費參考" [ref=e38]
+                - cell "10,000 元" [ref=e39]
+              - row "課後留園 無" [ref=e40]:
+                - rowheader "課後留園" [ref=e41]
+                - cell "無" [ref=e42]
+              - row "室內面積 796.08平方公尺" [ref=e43]:
+                - rowheader "室內面積" [ref=e44]
+                - cell "796.08平方公尺" [ref=e45]
+              - row "室外面積 1,345.5平方公尺" [ref=e46]:
+                - rowheader "室外面積" [ref=e47]
+                - cell "1,345.5平方公尺" [ref=e48]
+              - row "使用樓層 1樓、2樓" [ref=e49]:
+                - rowheader "使用樓層" [ref=e50]
+                - cell "1樓、2樓" [ref=e51]
+              - row "立案文號 府教幼字第1093715670號" [ref=e52]:
+                - rowheader "立案文號" [ref=e53]
+                - cell "府教幼字第1093715670號" [ref=e54]
+              - row "立案日期 1983/03/30" [ref=e55]:
+                - rowheader "立案日期" [ref=e56]
+                - cell "1983/03/30" [ref=e57]
+        - generic [ref=e58]:
+          - generic [ref=e59]:
+            - heading "裁罰紀錄（近 5 年 3 筆）" [level=2] [ref=e60]
+            - generic [ref=e61]:
+              - article [ref=e62]:
+                - generic [ref=e63]:
+                  - time [ref=e64]: 2026-06-03
+                  - generic [ref=e65]: 府授教幼字第1150655429號
+                  - generic [ref=e66]: 官方公告中
+                - generic [ref=e67]:
+                  - term [ref=e68]: 依據法規
+                  - definition [ref=e69]: 幼兒教育及照顧法 第58條第1項第1款(111/6/29修正公布)
+                  - term [ref=e70]: 違反規定
+                  - definition [ref=e71]: 第8條第6項-空間與面積 幼兒園違反必要設置空間與總面積規定。
+                  - term [ref=e72]: 處分內容
+                  - definition [ref=e73]: 罰鍰：6,000 元
+              - article [ref=e74]:
+                - generic [ref=e75]:
+                  - time [ref=e76]: 2026-06-03
+                  - generic [ref=e77]: 府授教幼字第1150655429號
+                  - generic [ref=e78]: 官方公告中
+                - generic [ref=e79]:
+                  - term [ref=e80]: 依據法規
+                  - definition [ref=e81]: 幼兒教育及照顧法 第52條第2款(111/6/29修正公布)
+                  - term [ref=e82]: 違反規定
+                  - definition [ref=e83]: 第16條第1項-班級人數 幼兒園編班違反班級人數限制。
+                  - term [ref=e84]: 處分內容
+                  - definition [ref=e85]: 罰鍰：60,000 元
+              - article [ref=e86]:
+                - generic [ref=e87]:
+                  - time [ref=e88]: 2025-11-18
+                  - generic [ref=e89]: 府授教幼字第1149552832號
+                  - generic [ref=e90]: 官方已無、本站保留
+                - generic [ref=e91]:
+                  - term [ref=e92]: 依據法規
+                  - definition [ref=e93]: 幼兒教育及照顧法第56條第4款(111/6/29修正公布)
+                  - term [ref=e94]: 違反規定
+                  - definition [ref=e95]: 第31條第3項幼兒園幼童專用車標識、接送幼兒、駕駛人或隨車人員未符規定。
+                  - term [ref=e96]: 處分內容
+                  - definition [ref=e97]: 罰鍰：9,000元
+            - group [ref=e98]:
+              - generic "更早的紀錄（52 筆，最早 2019-04-12）" [ref=e99] [cursor=pointer]
+          - generic [ref=e100]:
+            - heading "新竹縣湖口鄉的其他幼兒園" [level=2] [ref=e101]
+            - table [ref=e102]:
+              - rowgroup [ref=e103]:
+                - row "名稱 裁罰" [ref=e104]:
+                  - columnheader "名稱" [ref=e105]
+                  - columnheader "裁罰" [ref=e106]
+              - rowgroup [ref=e107]:
+                - row "新竹縣私立古佳正幼兒園 8" [ref=e108]:
+                  - cell "新竹縣私立古佳正幼兒園" [ref=e109]:
+                    - link "新竹縣私立古佳正幼兒園" [ref=e110] [cursor=pointer]:
+                      - /url: /i/preschool-e41b68b6-813a-4cb1-9494-e093abe5dd11.html
+                  - cell "8" [ref=e111]
+                - row "新竹縣私立盧森堡幼兒園 3" [ref=e112]:
+                  - cell "新竹縣私立盧森堡幼兒園" [ref=e113]:
+                    - link "新竹縣私立盧森堡幼兒園" [ref=e114] [cursor=pointer]:
+                      - /url: /i/preschool-2e33963e-b252-477a-905a-a98a105cea6a.html
+                  - cell "3" [ref=e115]
+                - row "新竹縣私立宏儒幼兒園 3" [ref=e116]:
+                  - cell "新竹縣私立宏儒幼兒園" [ref=e117]:
+                    - link "新竹縣私立宏儒幼兒園" [ref=e118] [cursor=pointer]:
+                      - /url: /i/preschool-eb92cc70-9422-46f6-b35a-41d7de3a6a85.html
+                  - cell "3" [ref=e119]
+                - row "新竹縣私立佳佳幼兒園 3" [ref=e120]:
+                  - cell "新竹縣私立佳佳幼兒園" [ref=e121]:
+                    - link "新竹縣私立佳佳幼兒園" [ref=e122] [cursor=pointer]:
+                      - /url: /i/preschool-cbff15c3-551b-48e2-9f6c-124732b4c875.html
+                  - cell "3" [ref=e123]
+                - row "新竹縣私立威佑幼兒園 2" [ref=e124]:
+                  - cell "新竹縣私立威佑幼兒園" [ref=e125]:
+                    - link "新竹縣私立威佑幼兒園" [ref=e126] [cursor=pointer]:
+                      - /url: /i/preschool-ba2960c4-f79c-4e50-949a-4206004b492a.html
+                  - cell "2" [ref=e127]
+                - row "新竹縣私立精英幼兒園 2" [ref=e128]:
+                  - cell "新竹縣私立精英幼兒園" [ref=e129]:
+                    - link "新竹縣私立精英幼兒園" [ref=e130] [cursor=pointer]:
+                      - /url: /i/preschool-7e3981a4-7a91-4932-b2d4-03876041c5dd.html
+                  - cell "2" [ref=e131]
+                - row "新竹縣私立偉大人物幼兒園 1" [ref=e132]:
+                  - cell "新竹縣私立偉大人物幼兒園" [ref=e133]:
+                    - link "新竹縣私立偉大人物幼兒園" [ref=e134] [cursor=pointer]:
+                      - /url: /i/preschool-907eb25b-7356-41aa-8dd2-e013fae03ece.html
+                  - cell "1" [ref=e135]
+                - row "新竹縣私立喬大幼兒園 1" [ref=e136]:
+                  - cell "新竹縣私立喬大幼兒園" [ref=e137]:
+                    - link "新竹縣私立喬大幼兒園" [ref=e138] [cursor=pointer]:
+                      - /url: /i/preschool-2a38d6a9-3eb2-46c9-b249-d0182094616a.html
+                  - cell "1" [ref=e139]
+                - row "新竹縣私立張遇幼兒園 1" [ref=e140]:
+                  - cell "新竹縣私立張遇幼兒園" [ref=e141]:
+                    - link "新竹縣私立張遇幼兒園" [ref=e142] [cursor=pointer]:
+                      - /url: /i/preschool-cef32cef-b56c-47da-a158-c7ac5303e8cd.html
+                  - cell "1" [ref=e143]
+                - row "新竹縣私立張遇心幼兒園 1" [ref=e144]:
+                  - cell "新竹縣私立張遇心幼兒園" [ref=e145]:
+                    - link "新竹縣私立張遇心幼兒園" [ref=e146] [cursor=pointer]:
+                      - /url: /i/preschool-2ffce951-df3c-414b-9505-0c7df139530c.html
+                  - cell "1" [ref=e147]
+                - row "新竹縣私立張遇文幼兒園 1" [ref=e148]:
+                  - cell "新竹縣私立張遇文幼兒園" [ref=e149]:
+                    - link "新竹縣私立張遇文幼兒園" [ref=e150] [cursor=pointer]:
+                      - /url: /i/preschool-0b701897-a6b5-47da-a9b4-064f391b98a4.html
+                  - cell "1" [ref=e151]
+                - row "新竹縣私立故事島幼兒園 1" [ref=e152]:
+                  - cell "新竹縣私立故事島幼兒園" [ref=e153]:
+                    - link "新竹縣私立故事島幼兒園" [ref=e154] [cursor=pointer]:
+                      - /url: /i/preschool-3514753e-adf6-4d10-aea8-819bdd22f877.html
+                  - cell "1" [ref=e155]
+          - generic [ref=e156]:
+            - heading "這家機構再被裁罰時通知我" [level=2] [ref=e157]
+            - paragraph [ref=e158]: LINE 訂閱功能整備中。上線後可在這裡追蹤單一機構，有新裁罰即推播。
+  - contentinfo [ref=e159]:
+    - generic [ref=e160]:
+      - paragraph [ref=e161]: 裁罰資料來自教育部全國教保資訊網與衛生福利部社會及家庭署違反兒少法裁罰專區； 托嬰中心基本資料、評鑑與收費取自社家署托育媒合平臺； 幼兒園基本資料與地圖座標取自 kiang 的開放資料（MIT）。
+      - paragraph [ref=e162]: 本站不公開自然人裁罰紀錄，公文所載姓名一律遮罩。資料如與主管機關公告不符，以主管機關為準。
+      - paragraph [ref=e163]: 資料更新日 2026-08-09

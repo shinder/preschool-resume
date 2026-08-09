@@ -25,18 +25,21 @@ PUBLIC = {
          "capacity_approved": 120, "enrolled": None, "pre_public": "無",
          "monthly_fee": 3000, "is_active": True, "reg_no": "北市教字第1號",
          "penalty_count": 2, "last_penalty_date": "2024-01-01",
-         "removed_penalty_count": 1, "archived_penalty_count": 0},
+         "removed_penalty_count": 1, "archived_penalty_count": 0,
+         "recent_penalty_count": 1},
         {"id": "preschool:b", "kind": "preschool", "source": "ece", "native_id": "b",
          "name": "臺北市私立乙幼兒園", "city": "臺北市", "town": "中正區",
          "address": "臺北市中正區測試路2號", "lng": 121.51, "lat": 25.01,
          "is_active": False, "penalty_count": 0, "last_penalty_date": None,
-         "removed_penalty_count": 0, "archived_penalty_count": 0},
+         "removed_penalty_count": 0, "archived_penalty_count": 0,
+         "recent_penalty_count": 0},
         {"id": "babycare:CW1", "kind": "babycare", "source": "sfaa", "native_id": "CW1",
          "name": "新北市私立丙托嬰中心", "city": "新北市", "town": "板橋區",
          "address": "新北市板橋區測試路3號", "lng": 121.4, "lat": 25.0,
          "capacity_approved": 30, "enrolled": 25, "is_active": True,
          "penalty_count": 0, "last_penalty_date": None,
-         "removed_penalty_count": 0, "archived_penalty_count": 0},
+         "removed_penalty_count": 0, "archived_penalty_count": 0,
+         "recent_penalty_count": 0},
     ]},
     "penalties.json": {"as_of": "2026-08-09", "records": [
         {"id": "ece:1", "source": "ece", "institution_id": "preschool:a",
@@ -55,7 +58,8 @@ PUBLIC = {
          "former_name": "臺北市私立舊名幼兒園", "type": "renamed", "penalty_count": 1,
          "first_penalty_date": "2023-05-05", "last_penalty_date": "2023-05-05"},
     ]},
-    "meta.json": {"as_of": "2026-08-09", "counts": {
+    "meta.json": {"as_of": "2026-08-09", "recent_since": "2024-01-01",
+        "recent_years": 5, "counts": {
         "institutions": 3, "institutions_with_penalty": 1, "penalties": 2,
         "removed_penalties": 1, "archived_penalties": 0, "aliases": 1},
         "sources": [{"name": "測試來源", "url": "https://example.gov.tw"}],
@@ -92,10 +96,15 @@ def main():
         assert "&lt;script&gt;" in page
         assert "第26條第2項 <未逸出測試>" not in page
 
+        # 揭露分層：近五年展開、更早的收合，但仍完整保留於頁面上
+        assert "近 5 年 1 筆裁罰" in page and "更早 1 筆" in page
+        assert "<summary>更早的紀錄（1 筆，最早 2023-05-05）</summary>" in page
+        assert page.count('class="entry') == 2      # 兩筆都在 DOM 裡，只是一筆收合
+
         # 下架狀態：兩種標示要分得出來
         assert "官方公告中" in page and "官方已無、本站保留" in page
         assert "處分時名稱：臺北市私立舊名幼兒園" in page
-        assert "1 筆官方已無" in page
+        assert "官方已無 1 筆" in page
         # pre_public 為「無」時不該冒出徽章
         assert "準公共 無" not in page
         # 內部連結：同鄉鎮同類型的其他機構
@@ -114,8 +123,9 @@ def main():
         # 地圖點位：預設只給有裁罰者
         pen = json.loads((out / "data/points-penalized.json").read_text())
         allp = json.loads((out / "data/points-all.json").read_text())
+        # 預設圖層只放近五年有裁罰者，點位帶的也是近五年件數
         assert len(pen["rows"]) == 1 and len(allp["rows"]) == 3
-        assert pen["rows"][0][2] == 2                       # 裁罰筆數
+        assert pen["rows"][0][2] == 1
 
         # sitemap 收錄所有頁面且網址經過編碼
         sitemap = (out / "sitemap.xml").read_text()

@@ -249,3 +249,16 @@ a:hover { color: var(--seal); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* 更早的紀錄：保留但收合，不與近期紀錄等量呈現 */
+.older { margin-top: 1.5rem; }
+.older summary {
+  cursor: pointer; font-size: 0.875rem; color: var(--ink-soft);
+  padding: 0.6rem 0.85rem; background: var(--card); border: 1px dashed var(--rule);
+}
+.older summary:hover { color: var(--indigo); border-color: var(--indigo); }
+.older[open] summary { margin-bottom: 0.9rem; }
+.older .note {
+  font-size: 0.8125rem; color: var(--ink-soft); margin: 0 0 0.9rem;
+  padding-inline-start: 0.85rem; border-inline-start: 2px solid var(--rule);
+}

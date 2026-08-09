@@ -44,6 +44,11 @@ PENALTY_FIELDS = (
     "violation", "fact", "sanction", "penalty_date", "removed_at", "origin",
     "name_at_penalty",
 )
+# 揭露分層：近五年的紀錄預設顯示，更早的收合。官方公告期限依處分輕重為
+# 3 個月～6 年，永久等量呈現逾期紀錄不合比例；但「保留」與「顯著呈現」是兩件事——
+# 更早的紀錄仍完整公開、可查證，只是不再佔滿版面，也不進地圖預設圖層。
+RECENT_YEARS = 5
+
 ALIAS_FIELDS = (
     "institution_id", "current_name", "former_name", "type", "penalty_count",
     "first_penalty_date", "last_penalty_date",
@@ -127,6 +132,7 @@ def project_institutions(institutions: list[dict], summary: dict) -> list[dict]:
         pub = pick(r, INSTITUTION_FIELDS, set(name_tokens(r.get("owner"))))
         s = summary.get(r["id"], {})
         pub["penalty_count"] = s.get("count", 0)
+        pub["recent_penalty_count"] = s.get("recent", 0)
         pub["last_penalty_date"] = s.get("last_date")
         # 兩種「官方已無、本站仍有」要分開講：
         # removed  ＝ 我方觀測到的下架（有確切日期），護城河的計量單位
@@ -137,10 +143,11 @@ def project_institutions(institutions: list[dict], summary: dict) -> list[dict]:
     return out
 
 
-def project_penalties(penalties: list[dict], links: dict,
-                      inst_names: dict) -> tuple[list[dict], dict]:
+def project_penalties(penalties: list[dict], links: dict, inst_names: dict,
+                      recent_since: str) -> tuple[list[dict], dict]:
     out, summary = [], defaultdict(
-        lambda: {"count": 0, "last_date": None, "removed": 0, "archived": 0})
+        lambda: {"count": 0, "recent": 0, "last_date": None,
+                 "removed": 0, "archived": 0})
     for p in penalties:
         link = links.get(p["id"])
         if not link:
@@ -159,6 +166,8 @@ def project_penalties(penalties: list[dict], links: dict,
         d = p.get("penalty_date")
         if d:
             s["last_date"] = max(s["last_date"] or d, d)
+            if d >= recent_since:
+                s["recent"] += 1
         if p.get("removed_at") == "unknown":
             s["archived"] += 1
         elif p.get("removed_at"):
@@ -213,8 +222,15 @@ def main(argv: list[str]) -> int:
             return 2
         penalties.extend(rs)
 
+    year, month, day = (int(x) for x in as_of.split("-"))
+    try:
+        recent_since = date(year - RECENT_YEARS, month, day).isoformat()
+    except ValueError:                       # 2/29
+        recent_since = date(year - RECENT_YEARS, month, day - 1).isoformat()
+
     inst_names = {r["id"]: r["name"] for r in institutions}
-    pub_penalties, summary = project_penalties(penalties, links, inst_names)
+    pub_penalties, summary = project_penalties(penalties, links, inst_names,
+                                               recent_since)
     pub_institutions = project_institutions(institutions, summary)
     # renamed_unlinked 的舊名裡混著人名且未經確認，MVP 不公開
     pub_aliases = [pick(a, ALIAS_FIELDS,
@@ -223,8 +239,11 @@ def main(argv: list[str]) -> int:
                    for a in aliases if a["type"] != "renamed_unlinked"]
 
     with_penalty = sum(1 for r in pub_institutions if r["penalty_count"])
+    with_recent = sum(1 for r in pub_institutions if r["recent_penalty_count"])
     removed = sum(r["removed_penalty_count"] for r in pub_institutions)
     archived = sum(r["archived_penalty_count"] for r in pub_institutions)
+    log(f"揭露分層：{recent_since} 起為近期，"
+        f"近五年有裁罰 {with_recent:,} 家、更早才有的 {with_penalty - with_recent:,} 家")
     log(f"公開層：機構 {len(pub_institutions):,} 家（有裁罰 {with_penalty:,}）、"
         f"裁罰 {len(pub_penalties):,} 筆（我方觀測到下架 {removed:,}、"
         f"歷史存檔 {archived:,}）、別名 {len(pub_aliases)} 組")
@@ -237,8 +256,11 @@ def main(argv: list[str]) -> int:
         "aliases.json": {"as_of": as_of, "aliases": pub_aliases},
         "meta.json": {
             "as_of": as_of,
+            "recent_since": recent_since,
+            "recent_years": RECENT_YEARS,
             "counts": {"institutions": len(pub_institutions),
                        "institutions_with_penalty": with_penalty,
+                       "institutions_with_recent_penalty": with_recent,
                        "penalties": len(pub_penalties),
                        "removed_penalties": removed,
                        "archived_penalties": archived,
@@ -269,8 +291,8 @@ def main(argv: list[str]) -> int:
 
     # 白名單自我檢查：輸出不得出現白名單以外的欄位
     for rows, allowed, label in ((pub_institutions, INSTITUTION_FIELDS + (
-            "penalty_count", "last_penalty_date", "removed_penalty_count",
-            "archived_penalty_count"), "機構"),
+            "penalty_count", "recent_penalty_count", "last_penalty_date",
+            "removed_penalty_count", "archived_penalty_count"), "機構"),
             (pub_penalties, PENALTY_FIELDS, "裁罰"),
             (pub_aliases, ALIAS_FIELDS, "別名")):
         extra = {k for r in rows for k in r} - set(allowed)

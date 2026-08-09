@@ -149,6 +149,10 @@ def main():
         a = insts["preschool:a"]
         assert (a["penalty_count"], a["removed_penalty_count"],
                 a["archived_penalty_count"]) == (3, 1, 1), a
+        # 揭露分層：as_of 2026-08-09 → 近五年自 2021-08-09 起，ece:3（2019）不算
+        assert a["recent_penalty_count"] == 2, a
+        meta = json.loads((out / "meta.json").read_text())
+        assert meta["recent_since"] == "2021-08-09" and meta["recent_years"] == 5
         assert a["last_penalty_date"] == "2024-01-01"
         assert insts["babycare:CW1"]["penalty_count"] == 1
 

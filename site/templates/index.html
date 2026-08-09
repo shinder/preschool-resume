@@ -29,11 +29,11 @@
 
   <section class="mapblock">
     <div class="mapbar">
-      <label><input type="checkbox" id="show-all"> 一併顯示無裁罰紀錄的機構</label>
+      <label><input type="checkbox" id="show-all"> 一併顯示其餘機構（含僅有更早紀錄者）</label>
       <span id="map-status"></span>
       <span class="legend">
-        <span><i class="has"></i>有裁罰紀錄</span>
-        <span><i class="none"></i>無裁罰紀錄</span>
+        <span><i class="has"></i>近 {{ recent_years }} 年有裁罰</span>
+        <span><i class="none"></i>其餘</span>
       </span>
     </div>
     <div id="map"></div>

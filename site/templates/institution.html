@@ -26,11 +26,14 @@
       <span class="badge">{{ kind_label }}</span>
       {%- if inst.org_type %}<span class="badge">{{ inst.org_type }}</span>{% endif %}
       {%- if not inst.is_active %}<span class="badge closed">名冊顯示已停辦</span>{% endif %}
-      {%- if inst.penalty_count %}
-      <span class="badge alert num">{{ inst.penalty_count }} 筆裁罰紀錄</span>
+      {%- if penalties %}
+      <span class="badge alert num">近 {{ recent_years }} 年 {{ penalties|length }} 筆裁罰</span>
+      {%- endif %}
+      {%- if older %}
+      <span class="badge num">更早 {{ older|length }} 筆</span>
       {%- endif %}
       {%- if archived_count %}
-      <span class="badge alert num">{{ archived_count }} 筆官方已無</span>
+      <span class="badge num">官方已無 {{ archived_count }} 筆</span>
       {%- endif %}
       {%- if inst.pre_public and inst.pre_public != "無" %}
       <span class="badge">{{ "準公共" if inst.pre_public == "是" else "準公共 " ~ inst.pre_public }}</span>
@@ -94,33 +97,48 @@
     </aside>
 
     <div class="main">
+      {%- macro ledger(items) %}
+      <div class="ledger">
+        {%- for p in items %}
+        <article class="entry{% if p.archived %} archived{% endif %}">
+          <header>
+            <time datetime="{{ p.penalty_date }}">{{ p.penalty_date }}</time>
+            {%- if p.doc_no %}<span class="docno">{{ p.doc_no }}</span>{% endif %}
+            <span class="state{% if p.archived %} archived{% endif %}">
+              {{- "官方已無、本站保留" if p.archived else "官方公告中" -}}
+            </span>
+          </header>
+          <dl>
+            {%- if p.law %}<dt>依據法規</dt><dd>{{ p.law }}</dd>{% endif %}
+            {%- if p.violation %}<dt>違反規定</dt><dd>{{ p.violation }}</dd>{% endif %}
+            {%- if p.fact %}<dt>事實摘要</dt><dd>{{ p.fact }}</dd>{% endif %}
+            {%- if p.sanction %}<dt>處分內容</dt><dd>{{ p.sanction }}</dd>{% endif %}
+          </dl>
+          {%- if p.name_at_penalty %}
+          <p class="former">處分時名稱：{{ p.name_at_penalty }}</p>
+          {%- endif %}
+        </article>
+        {%- endfor %}
+      </div>
+      {%- endmacro %}
+
       <section class="section">
-        <h2>裁罰紀錄{% if penalties %}（{{ penalties|length }} 筆）{% endif %}</h2>
+        <h2>裁罰紀錄{% if penalties %}（近 {{ recent_years }} 年 {{ penalties|length }} 筆）{% endif %}</h2>
         {%- if penalties %}
-        <div class="ledger">
-          {%- for p in penalties %}
-          <article class="entry{% if p.archived %} archived{% endif %}">
-            <header>
-              <time datetime="{{ p.penalty_date }}">{{ p.penalty_date }}</time>
-              {%- if p.doc_no %}<span class="docno">{{ p.doc_no }}</span>{% endif %}
-              <span class="state{% if p.archived %} archived{% endif %}">
-                {{- "官方已無、本站保留" if p.archived else "官方公告中" -}}
-              </span>
-            </header>
-            <dl>
-              {%- if p.law %}<dt>依據法規</dt><dd>{{ p.law }}</dd>{% endif %}
-              {%- if p.violation %}<dt>違反規定</dt><dd>{{ p.violation }}</dd>{% endif %}
-              {%- if p.fact %}<dt>事實摘要</dt><dd>{{ p.fact }}</dd>{% endif %}
-              {%- if p.sanction %}<dt>處分內容</dt><dd>{{ p.sanction }}</dd>{% endif %}
-            </dl>
-            {%- if p.name_at_penalty %}
-            <p class="former">處分時名稱：{{ p.name_at_penalty }}</p>
-            {%- endif %}
-          </article>
-          {%- endfor %}
-        </div>
+        {{ ledger(penalties) }}
+        {%- elif older %}
+        <p class="empty">近 {{ recent_years }} 年查無裁罰紀錄。更早的紀錄見下方。</p>
         {%- else %}
         <p class="empty">目前查無裁罰紀錄。本站收錄自 {{ coverage_from }} 起的公告，含官方已下架者。</p>
+        {%- endif %}
+
+        {%- if older %}
+        <details class="older">
+          <summary>更早的紀錄（{{ older|length }} 筆，最早 {{ older[-1].penalty_date }}）</summary>
+          <p class="note">主管機關依處分輕重設 3 個月至 6 年的公告期限。以下紀錄多已逾期下架，
+             保留供查證，判斷現況時請留意時間。</p>
+          {{ ledger(older) }}
+        </details>
         {%- endif %}
       </section>
 
@@ -158,7 +176,7 @@
             {%- for n in neighbours %}
             <tr>
               <td><a href="{{ n.url }}">{{ n.name }}</a></td>
-              <td class="num{% if n.penalty_count %} hit{% endif %}">{{ n.penalty_count or "—" }}</td>
+              <td class="num{% if n.recent_penalty_count %} hit{% endif %}">{{ n.recent_penalty_count or "—" }}</td>
             </tr>
             {%- endfor %}
           </tbody>
