@@ -15,8 +15,8 @@ name: backup
 
 on:
   schedule:
-    - cron: "30 21 * * 0-5" # 台北 05:30（週日至週五）：增量
-    - cron: "30 21 * * 6"   # 台北週六 05:30：全量
+    - cron: "30 21 * * 0-4,6" # UTC 週六至週四 21:30 ＝ 台北週日至週五 05:30：增量
+    - cron: "30 21 * * 5"     # UTC 週五 21:30 ＝ 台北週六 05:30：全量
   workflow_dispatch:
     inputs:
       mode:
@@ -45,7 +45,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MODE="${{ inputs.mode }}"
-          elif [ "${{ github.event.schedule }}" = "30 21 * * 6" ]; then
+          elif [ "${{ github.event.schedule }}" = "30 21 * * 5" ]; then
             MODE="full"
           else
             MODE="new-only"
