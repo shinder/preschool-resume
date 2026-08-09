@@ -1,12 +1,15 @@
 /* 全台機構地圖：NLSC EMAP16 底圖（無等高線及門牌，全套裡最乾淨的一版）。
-   兩種顯示模式，語意不同不混用同一組標記：
-   - 裁罰紀錄：預設只載入近五年有裁罰者，9,700 多個點同時上圖既慢又難讀
-   - 托嬰中心空位：核定收托減實際收托，只有托嬰中心有這組數字
 
-   標記顏色不是唯一的區別管道：紅綠是色覺辨識最常見的失敗組合，所以綠取
-   與硃砂明度差最大的亮綠（明度比 1.74；深綠只有 1.06 反而更難分），並讓
-   「無裁罰」畫成空心環、「有裁罰」實心。聚合標記也依類型分群，否則一顆
-   混合叢集會被塗成紅色，讓整區看起來都有裁罰。 */
+   聚合層與個別層分工不同，配色也分開：
+   - 聚合（縮小時）：一顆橘色圓圈標該區「所有機構總數」。混合叢集不該被塗成
+     紅或綠——那會讓整區看起來都有裁罰、或都沒有；橘色是中性的計數標記。
+   - 個別（放大後）：紅＝近五年有裁罰、綠＝無。兩者大小一致，件數放在彈出視窗，
+     不用半徑編碼，免得「大紅點」在縮圖層級被誤讀成嚴重程度。
+     紅綠是色覺辨識最常見的失敗組合，故綠取與硃砂明度差最大的亮綠（明度比 1.74，
+     深綠只有 1.06 反而更難分），並讓無裁罰畫成空心環、有裁罰實心，
+     多給一個非色彩的區別管道。
+
+   兩種顯示模式（裁罰紀錄／托嬰中心空位）語意不同，不共用同一組標記。 */
 (function () {
   var el = document.getElementById("map");
   if (!el) return;
@@ -21,10 +24,8 @@
   }).addTo(map);
   map.on("click", function () { map.scrollWheelZoom.enable(); });
 
-  var cache = {};      // 檔名 → rows
-  var shown = [];      // 目前掛在地圖上的圖層
-  var checkbox = document.getElementById("show-all");
-  var showAllLabel = document.getElementById("show-all-label");
+  var cache = {};
+  var current = null;
   var modeSelect = document.getElementById("map-mode");
   var status = document.getElementById("map-status");
   var legends = {
@@ -32,33 +33,37 @@
     vacancy: document.getElementById("legend-vacancy"),
   };
 
+  var RADIUS = 6;
   var STYLES = {
-    penalty: { color: "#b23a2f", fill: "#b23a2f", opacity: 0.75, weight: 1 },
-    clean: { color: "#2e9e5b", fill: "#2e9e5b", opacity: 0.2, weight: 1.5 },
-    vacant: { color: "#234e70", fill: "#234e70", opacity: 0.7, weight: 1 },
+    penalty: { color: "#b23a2f", fill: "#b23a2f", opacity: 0.8, weight: 1 },
+    clean: { color: "#2e9e5b", fill: "#2e9e5b", opacity: 0.4, weight: 2 },
+    vacant: { color: "#234e70", fill: "#234e70", opacity: 0.75, weight: 1 },
     full: { color: "#7d94a4", fill: "#9bb0bf", opacity: 0.45, weight: 1 },
   };
 
-  function marker(row, style, radius, label) {
+  function marker(row, style, label) {
     var m = L.circleMarker([row[1], row[0]], {
-      radius: radius, color: style.color, weight: style.weight,
+      radius: RADIUS, color: style.color, weight: style.weight,
       fillColor: style.fill, fillOpacity: style.opacity,
     });
-    m.bindPopup('<a href="' + row[4] + '"><b>' + row[3] + "</b></a><br>" + label);
+    var url = "/i/" + row[4] + ".html";
+    m.bindPopup('<a href="' + url + '"><b>' + row[3] + "</b></a><br>" + label);
     return m;
   }
 
-  function group(extraClass) {
+  function cluster() {
     return L.markerClusterGroup({
       chunkedLoading: true,
       maxClusterRadius: 55,
       spiderfyOnMaxZoom: true,
-      iconCreateFunction: function (cluster) {
-        var n = cluster.getChildCount();
+      // 放大到街廓層級就全部攤開，否則綠點永遠躲在叢集裡看不到
+      disableClusteringAtZoom: 15,
+      iconCreateFunction: function (c) {
+        var n = c.getChildCount();
         var size = n < 10 ? "small" : n < 100 ? "medium" : "large";
         return new L.DivIcon({
           html: "<div><span>" + n + "</span></div>",
-          className: "marker-cluster marker-cluster-" + size + " " + extraClass,
+          className: "marker-cluster marker-cluster-" + size,
           iconSize: new L.Point(40, 40),
         });
       },
@@ -76,61 +81,45 @@
       });
   }
 
-  function replace(layers) {
-    shown.forEach(function (l) { map.removeLayer(l); });
-    shown = layers;
-    layers.forEach(function (l) { l.addTo(map); });
+  function draw(rows, build) {
+    var group = cluster();
+    rows.forEach(function (row) { group.addLayer(build(row)); });
+    if (current) map.removeLayer(current);
+    current = group;
+    group.addTo(map);
     if (status) status.textContent = "";
   }
 
-  function renderPenalty(rows, includeClean) {
-    var hit = group("cluster-penalty");
-    var clean = group("cluster-clean");
-    rows.forEach(function (row) {
-      var n = row[2];
-      if (n) {
-        hit.addLayer(marker(row, STYLES.penalty, Math.min(5 + n, 11),
-                            n + " 筆裁罰紀錄（近五年）"));
-      } else if (includeClean) {
-        clean.addLayer(marker(row, STYLES.clean, 4, "近五年無裁罰紀錄"));
-      }
-    });
-    replace(includeClean ? [clean, hit] : [hit]);
+  function penaltyMarker(row) {
+    var n = row[2];
+    return marker(row, n ? STYLES.penalty : STYLES.clean,
+                  n ? n + " 筆裁罰紀錄（近五年）" : "近五年無裁罰紀錄");
   }
 
-  function renderVacancy(rows) {
-    var vacant = group("cluster-vacant");
-    var full = group("cluster-full");
-    rows.forEach(function (row) {
-      var v = row[2];
-      // 實際收托是站方回報值、非即時，標明時點免得家長照著撲空
-      var label = (v > 0 ? "約 " + v + " 個空位" : "已額滿") +
-                  "<br>核定 " + row[5] + " 人／實際 " + row[6] + " 人" +
-                  (row[7] ? "（依 " + row[7] + " 名冊）" : "");
-      if (v > 0) {
-        vacant.addLayer(marker(row, STYLES.vacant, Math.min(4 + v / 3, 11), label));
-      } else {
-        full.addLayer(marker(row, STYLES.full, 4, label));
-      }
-    });
-    replace([full, vacant]);
+  function vacancyMarker(row) {
+    var v = row[2];
+    // 實際收托是站方回報值、非即時，標明時點免得家長照著撲空
+    var label = (v > 0 ? "約 " + v + " 個空位" : "已額滿") +
+                "<br>核定 " + row[5] + " 人／實際 " + row[6] + " 人" +
+                (row[7] ? "（依 " + row[7] + " 名冊）" : "");
+    return marker(row, v > 0 ? STYLES.vacant : STYLES.full, label);
   }
 
   function render() {
     var vacancy = modeSelect && modeSelect.value === "vacancy";
-    if (showAllLabel) showAllLabel.hidden = vacancy;
     if (legends.penalty) legends.penalty.hidden = vacancy;
     if (legends.vacancy) legends.vacancy.hidden = !vacancy;
     if (vacancy) {
-      fetchRows("/data/points-vacancy.json", renderVacancy);
-    } else if (checkbox && checkbox.checked) {
-      fetchRows("/data/points-all.json", function (rows) { renderPenalty(rows, true); });
+      fetchRows("/data/points-vacancy.json", function (rows) {
+        draw(rows, vacancyMarker);
+      });
     } else {
-      fetchRows("/data/points-penalized.json", function (rows) { renderPenalty(rows, false); });
+      fetchRows("/data/points-all.json", function (rows) {
+        draw(rows, penaltyMarker);
+      });
     }
   }
 
   if (modeSelect) modeSelect.addEventListener("change", render);
-  if (checkbox) checkbox.addEventListener("change", render);
   render();
 })();

@@ -237,30 +237,35 @@ def main(argv: list[str]) -> int:
     files += 3
 
     # ---------- 地圖點位 ----------
+    # 點位檔為預設載入，體積要省：座標取 5 位小數（約 1 公尺，地圖用綽綽有餘），
+    # 網址只存 id 片段，由前端補上 /i/ 與 .html
+    def slug(inst):
+        return f"{inst['kind']}-{inst['native_id']}"
+
+    def coord(v):
+        return round(v, 5)
+
     def point(inst):
-        return [inst["lng"], inst["lat"], inst.get("recent_penalty_count", 0),
-                inst["name"], href(inst_path(inst))]
+        return [coord(inst["lng"]), coord(inst["lat"]),
+                inst.get("recent_penalty_count", 0), inst["name"], slug(inst)]
 
     def vacancy_point(inst):
-        return [inst["lng"], inst["lat"], inst["vacancy"], inst["name"],
-                href(inst_path(inst)), inst["capacity_approved"], inst["enrolled"],
-                inst.get("enrolled_as_of")]
+        return [coord(inst["lng"]), coord(inst["lat"]), inst["vacancy"],
+                inst["name"], slug(inst), inst["capacity_approved"],
+                inst["enrolled"], inst.get("enrolled_as_of")]
 
     located = [i for i in institutions if i.get("lng") is not None]
-    # 地圖預設只標近五年——一筆多年前的舊紀錄不該讓機構永遠是紅點
     penalized = [i for i in located if i.get("recent_penalty_count")]
     # 缺額圖層：只有托嬰中心有實際收托數
     with_vacancy = [i for i in located if i.get("vacancy") is not None]
-    for name, rows in (("points-penalized.json", penalized), ("points-all.json", located)):
-        write(out / "data" / name, json.dumps(
-            {"cols": ["lng", "lat", "n", "name", "url"],
-             "rows": [point(i) for i in rows]}, ensure_ascii=False))
-        files += 1
+    write(out / "data" / "points-all.json", json.dumps(
+        {"cols": ["lng", "lat", "n", "name", "slug"],
+         "rows": [point(i) for i in located]}, ensure_ascii=False))
     write(out / "data" / "points-vacancy.json", json.dumps(
-        {"cols": ["lng", "lat", "vacancy", "name", "url", "capacity", "enrolled",
+        {"cols": ["lng", "lat", "vacancy", "name", "slug", "capacity", "enrolled",
                   "as_of"],
          "rows": [vacancy_point(i) for i in with_vacancy]}, ensure_ascii=False))
-    files += 1
+    files += 2
 
     # ---------- sitemap 與 robots ----------
     write(out / "sitemap.xml", env.get_template("sitemap.xml").render(urls=urls))
@@ -281,7 +286,7 @@ def main(argv: list[str]) -> int:
 
     log(f"產出 {files:,} 檔於 {out}：機構 {len(institutions):,}、"
         f"縣市 {len(city_cards)}、鄉鎮市區 {len(by_town)}；"
-        f"地圖點位 {len(penalized):,}／{len(located):,}、"
+        f"地圖點位 {len(located):,}（近五年有裁罰 {len(penalized):,}）、"
         f"缺額圖層 {len(with_vacancy):,}"
         f"（有空位 {sum(1 for i in with_vacancy if i['vacancy'] > 0):,}）")
     if noindex:

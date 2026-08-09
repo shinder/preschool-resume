@@ -113,28 +113,20 @@ a:hover { color: var(--seal); }
    降飽和＋提亮，把它壓成淡灰底，硃砂標記才跳得出來，中文地名也還讀得到。 */
 .leaflet-tile-pane { filter: saturate(0.28) brightness(1.1) contrast(0.92); }
 
-/* 自訂聚合標記：預設的綠黃橘與本站配色衝突，改用硃砂三階 */
+/* 聚合標記是中性的計數，不代表裁罰——用橘色，避免紅／綠暗示整區的狀態 */
 .marker-cluster {
-  background: rgba(178, 58, 47, 0.18); border-radius: 50%; background-clip: padding-box;
+  background: rgba(217, 130, 43, 0.2); border-radius: 50%; background-clip: padding-box;
 }
 .marker-cluster div {
   width: 30px; height: 30px; margin: 5px; border-radius: 50%;
-  background: rgba(178, 58, 47, 0.85); color: #fff; text-align: center;
+  background: rgba(198, 116, 35, 0.9); color: #fff; text-align: center;
   font-family: var(--mono); font-size: 0.75rem; font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .marker-cluster span { line-height: 30px; }
-.marker-cluster-medium div { background: rgba(150, 44, 35, 0.9); }
-.marker-cluster-large { background: rgba(120, 34, 27, 0.2); }
-.marker-cluster-large div { background: rgba(120, 34, 27, 0.92); }
-
-/* 聚合標記依類型分群上色——混合叢集塗成紅色會讓整區看起來都有裁罰 */
-.marker-cluster.cluster-clean { background: rgba(46, 158, 91, 0.18); }
-.marker-cluster.cluster-clean div { background: rgba(46, 158, 91, 0.8); }
-.marker-cluster.cluster-vacant { background: rgba(35, 78, 112, 0.18); }
-.marker-cluster.cluster-vacant div { background: rgba(35, 78, 112, 0.85); }
-.marker-cluster.cluster-full { background: rgba(125, 148, 164, 0.18); }
-.marker-cluster.cluster-full div { background: rgba(125, 148, 164, 0.85); }
+.marker-cluster-medium div { background: rgba(180, 104, 28, 0.92); }
+.marker-cluster-large { background: rgba(160, 92, 24, 0.22); }
+.marker-cluster-large div { background: rgba(160, 92, 24, 0.94); }
 .leaflet-popup-content { font-size: 0.875rem; line-height: 1.6; }
 
 .legend { display: flex; gap: 1rem; margin-inline-start: auto; }

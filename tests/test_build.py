@@ -83,8 +83,7 @@ def main():
                     "i/preschool-a.html", "i/preschool-b.html", "i/babycare-CW1.html",
                     "city/臺北市.html", "city/臺北市/中正區.html",
                     "city/新北市.html", "city/新北市/板橋區.html",
-                    "data/points-penalized.json", "data/points-all.json",
-                    "data/points-vacancy.json",
+                    "data/points-all.json", "data/points-vacancy.json",
                     "assets/style.css", "assets/leaflet.js"):
             assert (out / rel).exists(), f"缺少 {rel}"
         # 裁罰內嵌於機構頁，不另立頁（檔案數控制的關鍵）
@@ -122,11 +121,12 @@ def main():
         assert "目前查無裁罰紀錄" in empty and "核定收托" in empty
 
         # 地圖點位：預設只給有裁罰者
-        pen = json.loads((out / "data/points-penalized.json").read_text())
         allp = json.loads((out / "data/points-all.json").read_text())
-        # 預設圖層只放近五年有裁罰者，點位帶的也是近五年件數
-        assert len(pen["rows"]) == 1 and len(allp["rows"]) == 3
-        assert pen["rows"][0][2] == 1
+        # 預設圖層放全部機構（沒被罰的也要看得到），件數為近五年
+        assert len(allp["rows"]) == 3
+        hit = [r for r in allp["rows"] if r[2]]
+        assert len(hit) == 1 and hit[0][2] == 1
+        assert hit[0][4] == "preschool-a"          # 網址片段，前端補 /i/ 與 .html
         # 缺額圖層只收有實際收托數的托嬰中心
         vac = json.loads((out / "data/points-vacancy.json").read_text())
         assert len(vac["rows"]) == 1 and vac["rows"][0][2] == 5
