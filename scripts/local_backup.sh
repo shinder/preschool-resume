@@ -3,7 +3,16 @@
 #
 # 教保網封鎖境外 IP，GitHub Actions 跑不了，由台灣 IP 的機器執行本腳本
 # （目前部署在 old-mini 的 systemd timer，每日 06:30，見 scripts/systemd/）。
-# 平日增量（--new-only）、週六全量，與 Actions 端（社家署）同一套約定。
+#
+# **每日全量**（2026-08-09 起）。原本比照 Actions 端採平日增量、週六全量，
+# 但兩者的列表語意不同：社家署每筆裁罰有自己的 Detail id，新裁罰當天就會出現
+# 在列表上；教保網的列表是「有裁罰紀錄的園所」，已在列表上的園再被罰時，
+# 新紀錄只存在於該園的詳情頁，增量模式不會重抓——最慢要等到週六全量，
+# 延遲七天。實測 2,418 家受罰機構有 47% 不只被罰一次、再犯間隔下四分位僅
+# 48 天，這個延遲會讓第三階段的推播失去意義。
+#
+# 當初採增量是為了 Actions 每月 2,000 分鐘的免費額度，但這一軌搬到 old-mini
+# 之後不再消耗額度，代價只剩本機約一小時的機器時間，因此取消增量模式。
 #
 # 路徑：程式 repo 位置由腳本自身推得；資料 repo 預設為同層的
 # preschool-resume-data，可用環境變數 DATA_DIR 覆蓋。
@@ -20,14 +29,7 @@ echo "===== $(date '+%Y-%m-%d %H:%M:%S') 開始 ====="
 git -C "$CODE_DIR" pull --ff-only --quiet || echo "警告：code pull 失敗，用現有版本"
 git -C "$DATA_DIR" pull --rebase --quiet || echo "警告：data pull 失敗，用本地版本"
 
-MODE_FLAG="--new-only"
-MODE_NAME="new-only"
-if [ "$(date +%u)" = "6" ]; then
-  MODE_FLAG=""
-  MODE_NAME="full"
-fi
-
-python3 "$CODE_DIR/crawler/ece_moe.py" --data-dir "$DATA_DIR" $MODE_FLAG
+python3 "$CODE_DIR/crawler/ece_moe.py" --data-dir "$DATA_DIR"
 ECE=$?
 
 cd "$DATA_DIR" || exit 1
@@ -40,7 +42,7 @@ elif git diff --cached --quiet -- . ':!status'; then
   git commit -q -m "心跳 $(TZ=Asia/Taipei date +%F)（ece）"
   git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
 else
-  git commit -q -m "備份 $(date +%Y-%m-%d)（ece ${MODE_NAME}）"
+  git commit -q -m "備份 $(date +%Y-%m-%d)（ece 全量）"
   git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
 fi
 
