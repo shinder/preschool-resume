@@ -1,0 +1,16 @@
+// 幼兒園履歷（工程執行計劃 6.6）：只有靜態資產、沒有 Worker 程式碼。
+//
+// 沒有 `main` 就不會有 Worker 呼叫——靜態資產請求免費且不計入免費方案的
+// 每日 10 萬次上限。日後若要加動態端點（B 端試用 API、LINE webhook），
+// 補上 `main` 即可，未命中靜態檔的請求才會落到 Worker；
+// **不要開 run_worker_first**，那會讓所有請求都吃呼叫額度，且額度用盡時
+// 回 429 而不是退回送靜態檔（見第六階段技術決策表）。
+{
+  "name": "preschool-resume",
+  "compatibility_date": "2026-08-09",
+  "assets": {
+    "directory": "./build/site/",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  }
+}

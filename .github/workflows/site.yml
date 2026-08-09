@@ -1,0 +1,101 @@
+# 免費地圖建置與部署（工程執行計劃 6.6）
+#
+# 排在 diff（old-mini，台北 08:30）之後、watchdog（台北 09:30）之前，
+# 讓當天的新事件當天上站。
+#
+# 這條管線不碰政府網站，全部資料來自資料 repo 與 GitHub 上的 kiang 開放資料，
+# 所以不受教保網封鎖境外 IP 的限制，可以留在 Actions。
+#
+# 需要的設定（在 GitHub 上完成一次）：
+#   1. secrets.DATA_REPO_SSH_KEY   已存在（備份用的那把，需寫入權限）
+#   2. secrets.CLOUDFLARE_API_TOKEN  權限：Workers Scripts 編輯
+#   3. secrets.CLOUDFLARE_ACCOUNT_ID
+#   4. vars.SITE_BASE_URL          例：https://preschool-resume.<帳號>.workers.dev
+#                                  未設定時用 wrangler.jsonc 的預設名稱推導
+
+name: site
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # UTC 01:00 ＝ 台北 09:00，diff 跑完之後
+  workflow_dispatch:
+    inputs:
+      index:
+        description: "開放搜尋引擎索引（6b 才用；預設維持 noindex）"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v5
+
+      - name: Checkout 資料 repo
+        uses: actions/checkout@v5
+        with:
+          repository: shinder/preschool-resume-data
+          ssh-key: ${{ secrets.DATA_REPO_SSH_KEY }}
+          path: data
+          sparse-checkout: |
+            data
+            raw/kiang
+            status
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: 6.1 機構主檔
+        run: python3 site/institutions.py --data-dir data
+
+      - name: 6.2 裁罰↔機構對照
+        run: python3 site/match.py --data-dir data
+
+      - name: 提交主檔與對照結果
+        run: |
+          cd data
+          git add -A
+          git config user.name "site-bot"
+          git config user.email "shinder.lin@gmail.com"
+          git diff --cached --quiet || {
+            git commit -m "機構主檔與對照 $(TZ=Asia/Taipei date +%F)"
+            git push
+          }
+
+      - name: 6.3 公開層投影
+        run: python3 site/public_data.py --data-dir data --out build/public
+
+      - name: 6.4 建站
+        env:
+          BASE_URL: ${{ vars.SITE_BASE_URL }}
+        run: |
+          python3 site/build.py \
+            --public build/public --out build/site \
+            ${BASE_URL:+--base-url "$BASE_URL"} \
+            ${{ inputs.index && '--index' || '' }}
+
+      - name: 部署至 Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: 寫入心跳檔（供 watchdog 檢查）
+        if: always()
+        run: |
+          mkdir -p data/status
+          printf '{"date": "%s", "exit": %d}\n' \
+            "$(TZ=Asia/Taipei date +%F)" "${{ job.status == 'success' && 0 || 1 }}" \
+            > data/status/site.json
+          cd data
+          git add status
+          git diff --cached --quiet || {
+            git commit -m "心跳 $(TZ=Asia/Taipei date +%F)（site）"
+            git push
+          }

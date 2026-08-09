@@ -74,7 +74,8 @@ def main():
                            "--base-url", "https://example.workers.dev"]) == 0
 
         # 頁面齊全：3 機構＋2 縣市＋2 鄉鎮＋首頁＋關於
-        for rel in ("index.html", "about.html", "sitemap.xml", "robots.txt",
+        for rel in ("index.html", "about.html", "404.html", "_headers",
+                    "sitemap.xml", "robots.txt",
                     "i/preschool-a.html", "i/preschool-b.html", "i/babycare-CW1.html",
                     "city/臺北市.html", "city/臺北市/中正區.html",
                     "city/新北市.html", "city/新北市/板橋區.html",
@@ -103,6 +104,8 @@ def main():
         # 6a 全站 noindex，且 robots 仍允許檢索（擋掉就讀不到 noindex）
         assert '<meta name="robots" content="noindex, nofollow">' in page
         assert "Disallow" not in (out / "robots.txt").read_text()
+        # sitemap 與 data/*.json 沒有 meta 可掛，靠 _headers 蓋全站
+        assert "X-Robots-Tag: noindex" in (out / "_headers").read_text()
 
         # 無裁罰的機構頁要有實質內容與空狀態說明
         empty = (out / "i/babycare-CW1.html").read_text()

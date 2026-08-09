@@ -223,7 +223,8 @@ def main(argv: list[str]) -> int:
         counts=meta["counts"], cities=city_cards))
     write(out / "about.html", env.get_template("about.html").render(
         counts=meta["counts"], sources=meta["sources"]))
-    files += 2
+    write(out / "404.html", env.get_template("404.html").render())
+    files += 3
 
     # ---------- 地圖點位 ----------
     def point(inst):
@@ -244,6 +245,10 @@ def main(argv: list[str]) -> int:
     write(out / "robots.txt",
           f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n")
     files += 2
+    if noindex:
+        # HTML 有 meta noindex，但 sitemap 與 data/*.json 沒有；用 _headers 一次蓋全站
+        write(out / "_headers", "/*\n  X-Robots-Tag: noindex, nofollow\n")
+        files += 1
 
     assets = repo / "site" / "assets"
     for f in sorted(assets.iterdir()):
