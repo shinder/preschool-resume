@@ -10,8 +10,10 @@
 #   1. secrets.DATA_REPO_SSH_KEY   已存在（備份用的那把，需寫入權限）
 #   2. secrets.CLOUDFLARE_API_TOKEN  權限：Workers Scripts 編輯
 #   3. secrets.CLOUDFLARE_ACCOUNT_ID
-#   4. vars.SITE_BASE_URL          例：https://preschool-resume.<帳號>.workers.dev
-#                                  未設定時用 wrangler.jsonc 的預設名稱推導
+#   4. ggggg.app 這個 zone 要在同一個 Cloudflare 帳號下——wrangler 會自動建
+#      preschool.ggggg.app 的 DNS 記錄與憑證（wrangler.jsonc 的 custom_domain）
+#   5. vars.SITE_BASE_URL（選用）覆寫 sitemap 與 canonical 用的網址；
+#      未設定時用 site/build.py 的預設 https://preschool.ggggg.app
 
 name: site
 
