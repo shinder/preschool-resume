@@ -16,6 +16,8 @@
 
 用法：python3 crawler/backfill_kiang.py --data-dir PATH --kiang-crc PATH --kiang-ece PATH
       [--as-of YYYY-MM-DD] [--dry-run]
+      python3 crawler/backfill_kiang.py --data-dir PATH --dedupe [--dry-run]
+      --dedupe  只清理既有 penalties.json 裡的同案變體，不連任何來源
 """
 
 import json
@@ -32,6 +34,35 @@ from parse import SFAA_PERSON_CATEGORIES, _digest, norm_date
 def norm_key(s: str | None) -> str:
     """去重比對用正規化：移除所有空白與全形空白。"""
     return re.sub(r"[\s　]+", "", s or "")
+
+
+def variant_duplicates(records: list[dict]) -> set[str]:
+    """找出「同案變體」中該剔除的較短版本，回傳其 id。
+
+    官方改版前後對同一列的寫法不同：舊版只有條項（「第16條第4項」），新版在
+    後面接上說明（「第16條第4項幼兒園班級師生比違反規定。」）。同一份公文、
+    同一天、同樣的處分內容，且違反規定一方是另一方的前綴時，兩者是同一件事，
+    保留較完整的那筆。
+
+    2.4 原本只拿 kiang 列比對「既有官方紀錄」，沒有比對 kiang 列彼此，因此
+    完全沒有官方紀錄的園所（三筆都來自回補）整組漏網——實測 215 筆。
+    """
+    groups: dict[tuple, list[dict]] = {}
+    for r in records:
+        if r.get("doc_no") and r.get("penalty_date"):
+            key = (norm_key(r["doc_no"]), r["penalty_date"], norm_key(r.get("sanction")))
+            groups.setdefault(key, []).append(r)
+    drop = set()
+    for rows in groups.values():
+        if len(rows) < 2:
+            continue
+        texts = [(norm_key(r.get("violation")), r) for r in rows]
+        for short, rec in texts:
+            if not short:
+                continue
+            if any(long != short and long.startswith(short) for long, _ in texts):
+                drop.add(rec["id"])
+    return drop
 
 
 # ---------- crc（社家署） ----------
@@ -167,6 +198,13 @@ def backfill_ece(kiang_dir: Path, state: dict[str, dict]) -> tuple[list[dict], d
                     rid += "x"  # 與現有官方 id 罕見碰撞時的保底
                 r["id"] = rid
         added.extend(group)
+
+    # 批次內的同案變體：舊版只有條項、新版接了說明，兩列其實是同一件事。
+    # 原本只比對「既有官方紀錄」，漏掉 kiang 列彼此的情形（見 variant_duplicates）。
+    drop = variant_duplicates(added)
+    if drop:
+        stats["dup_variant"] += len(drop)
+        added = [r for r in added if r["id"] not in drop]
     return added, stats
 
 
@@ -177,18 +215,52 @@ def load_state(path: Path) -> dict[str, dict]:
             json.loads(path.read_text(encoding="utf-8"))["records"]}
 
 
+def dedupe_existing(data_dir: Path, as_of: str, dry_run: bool) -> int:
+    """清掉既有 penalties.json 裡的同案變體（2.4 當初漏掉的 kiang 對 kiang）。"""
+    total = 0
+    for source in ("ece", "sfaa"):
+        path = data_dir / "data" / source / "penalties.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        records = payload["records"]
+        drop = variant_duplicates(records)
+        # 只清回補資料：官方紀錄的生命週期由 diff 引擎管理，不在這裡動
+        drop = {r["id"] for r in records
+                if r["id"] in drop and r.get("origin") == "kiang"}
+        if not drop:
+            log(f"{source}：無同案變體")
+            continue
+        total += len(drop)
+        log(f"{source}：剔除同案變體 {len(drop)} 筆（{len(records)} → {len(records) - len(drop)}）")
+        if dry_run:
+            continue
+        payload["records"] = [r for r in records if r["id"] not in drop]
+        payload["dedupe_variants"] = as_of
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n",
+                        encoding="utf-8")
+    if dry_run:
+        log("--dry-run：不寫檔")
+    return 0 if total or dry_run else 0
+
+
 def main(argv: list[str]) -> int:
     def arg(name: str, default=None):
         return Path(argv[argv.index(name) + 1]) if name in argv else default
 
     data_dir = arg("--data-dir")
+    as_of = argv[argv.index("--as-of") + 1] if "--as-of" in argv else date.today().isoformat()
+    dry_run = "--dry-run" in argv
+
+    if "--dedupe" in argv:
+        if not data_dir:
+            log("需要 --data-dir")
+            return 2
+        return dedupe_existing(data_dir, as_of, dry_run)
+
     kiang_crc = arg("--kiang-crc")
     kiang_ece = arg("--kiang-ece")
     if not all((data_dir, kiang_crc, kiang_ece)):
         log("需要 --data-dir、--kiang-crc、--kiang-ece")
         return 2
-    as_of = argv[argv.index("--as-of") + 1] if "--as-of" in argv else date.today().isoformat()
-    dry_run = "--dry-run" in argv
 
     for source, backfill, kdir in (("sfaa", backfill_crc, kiang_crc),
                                    ("ece", backfill_ece, kiang_ece)):
