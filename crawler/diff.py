@@ -55,8 +55,9 @@ def diff_source(old: dict[str, dict], current: list[dict], as_of: str
             if prev.get(k) != v
         }
         reappeared = prev.get("removed_at") is not None
-        merged[rid] = {**rec, "first_seen": prev["first_seen"], "last_seen": as_of,
-                       "removed_at": None}
+        # 回補紀錄（origin=kiang）first_seen 為 None，重新上架時以當日補上
+        merged[rid] = {**rec, "first_seen": prev.get("first_seen") or as_of,
+                       "last_seen": as_of, "removed_at": None}
         if reappeared:
             events.append({"type": "new", "penalty_id": rid, "date": as_of,
                            "note": "reappeared"})
