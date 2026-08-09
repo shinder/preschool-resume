@@ -244,11 +244,13 @@ def main(argv: list[str]) -> int:
                        "archived_penalties": archived,
                        "aliases": len(pub_aliases)},
             "sources": [
-                {"name": "全國教保資訊網（教育部）", "url":
+                {"name": "幼兒園裁罰：全國教保資訊網（教育部）", "url":
                  "https://ap.ece.moe.edu.tw/webecems/punishSearch.aspx"},
-                {"name": "違反兒少法裁罰專區（衛福部社家署）", "url":
+                {"name": "托嬰中心裁罰：違反兒少法裁罰專區（衛福部社家署）", "url":
                  "https://crc.sfaa.gov.tw/ChildYoungLaw/Sanction"},
-                {"name": "機構主檔與座標：kiang 開放資料（MIT）", "url":
+                {"name": "托嬰中心基本資料、評鑑與收費：托育媒合平臺（衛福部社家署）",
+                 "url": "https://ncwisweb.sfaa.gov.tw/home/childcare-center"},
+                {"name": "幼兒園基本資料與地圖座標：kiang 開放資料（MIT）", "url":
                  "https://github.com/kiang"},
             ],
             "notice": "自然人裁罰不予公開；公文所載姓名一律遮罩。",
