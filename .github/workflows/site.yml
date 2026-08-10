@@ -95,10 +95,14 @@ jobs:
       - name: 寫入心跳檔（供 watchdog 檢查）
         if: always()
         run: |
+          # 用 shell 判斷而非 ${{ ... && 0 || 1 }}：Actions 運算式裡 0 是 falsy，
+          # 成功時 `true && 0` 得到 0、再掉進 `|| 1`，於是心跳永遠寫 1，
+          # watchdog 永遠紅。（2026-08-10 首次部署成功才發現。）
+          RC=0
+          [ "${{ job.status }}" = "success" ] || RC=1
           mkdir -p data/status
           printf '{"date": "%s", "exit": %d}\n' \
-            "$(TZ=Asia/Taipei date +%F)" "${{ job.status == 'success' && 0 || 1 }}" \
-            > data/status/site.json
+            "$(TZ=Asia/Taipei date +%F)" "$RC" > data/status/site.json
           cd data
           git add status
           git diff --cached --quiet || {
