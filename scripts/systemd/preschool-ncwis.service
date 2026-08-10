@@ -1,0 +1,13 @@
+# 托嬰中心主檔週更（部署於 old-mini）
+# 安裝：sudo cp scripts/systemd/preschool-ncwis.* /etc/systemd/system/
+#       sudo systemctl daemon-reload && sudo systemctl enable --now preschool-ncwis.timer
+[Unit]
+Description=托嬰中心主檔與缺額週更（托育媒合平臺）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=shinder
+ExecStart=/bin/bash /home/shinder/preschool-resume/scripts/local_ncwis.sh
+TimeoutStartSec=4h

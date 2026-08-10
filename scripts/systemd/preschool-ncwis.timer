@@ -1,0 +1,11 @@
+# 週六 04:30：平日回報的變動收齊到週五，且趕在 06:30 教保網備份之前跑完
+# （實測全量 80 分鐘），當天 09:00 建站即可吃到新的缺額。
+[Unit]
+Description=每週六 04:30 執行托嬰中心主檔週更
+
+[Timer]
+OnCalendar=Sat *-*-* 04:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
