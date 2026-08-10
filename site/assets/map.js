@@ -46,7 +46,7 @@
       radius: RADIUS, color: style.color, weight: style.weight,
       fillColor: style.fill, fillOpacity: style.opacity,
     });
-    var url = "/i/" + row[4] + ".html";
+    var url = "/i/" + row[4];
     m.bindPopup('<a href="' + url + '"><b>' + row[3] + "</b></a><br>" + label);
     return m;
   }

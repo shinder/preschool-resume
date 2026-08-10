@@ -107,8 +107,14 @@ def main():
         assert "官方已無 1 筆" in page
         # pre_public 為「無」時不該冒出徽章
         assert "準公共 無" not in page
-        # 內部連結：同鄉鎮同類型的其他機構
-        assert "i/preschool-b.html" in page
+        # 內部連結：同鄉鎮同類型的其他機構。網址不帶 .html——落地檔名是 .html，
+        # 但 Cloudflare 的 auto-trailing-slash 會把 /foo.html 導到 /foo，
+        # 連結若寫 .html 等於每次瀏覽都多一跳。
+        assert 'href="/i/preschool-b"' in page, "內部連結應不帶 .html"
+        assert "i/preschool-b.html" not in page
+        # canonical 指向同一個無副檔名網址
+        assert ('<link rel="canonical" href="https://example.workers.dev/i/preschool-a">'
+                in page), "缺少 canonical"
 
         # 6a 全站 noindex，且 robots 仍允許檢索（擋掉就讀不到 noindex）
         assert '<meta name="robots" content="noindex, nofollow">' in page
@@ -129,7 +135,7 @@ def main():
         assert "已停辦" in (out / "i/preschool-b.html").read_text()
         hit = [r for r in allp["rows"] if r[2]]
         assert len(hit) == 1 and hit[0][2] == 1
-        assert hit[0][4] == "preschool-a"          # 網址片段，前端補 /i/ 與 .html
+        assert hit[0][4] == "preschool-a"          # 網址片段，前端補 /i/
         # 缺額圖層只收有實際收托數的托嬰中心
         vac = json.loads((out / "data/points-vacancy.json").read_text())
         assert len(vac["rows"]) == 1 and vac["rows"][0][2] == 5
@@ -138,7 +144,8 @@ def main():
         # sitemap 收錄所有頁面且網址經過編碼
         sitemap = (out / "sitemap.xml").read_text()
         assert sitemap.count("<loc>") == 3 + 2 + 2 + 2
-        assert "/city/%E8%87%BA%E5%8C%97%E5%B8%82.html" in sitemap
+        assert "<loc>https://example.workers.dev/city/%E8%87%BA%E5%8C%97%E5%B8%82</loc>" in sitemap
+        assert ".html<" not in sitemap          # sitemap 也不得帶 .html，否則每筆都是一跳
 
     # 逸出閘門：有人在模板加了 |safe 就要擋下來
     with tempfile.TemporaryDirectory() as tmp:

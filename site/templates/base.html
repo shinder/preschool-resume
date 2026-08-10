@@ -8,6 +8,9 @@
 {%- if noindex %}
 <meta name="robots" content="noindex, nofollow">
 {%- endif %}
+{%- if canonical %}
+<link rel="canonical" href="{{ base_url }}{{ canonical }}">
+{%- endif %}
 <link rel="stylesheet" href="/assets/style.css">
 {%- block head %}{% endblock %}
 </head>

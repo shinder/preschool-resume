@@ -49,7 +49,14 @@ def town_path(city: str, town: str) -> str:
 
 
 def href(path: str) -> str:
-    """檔名含中文，連結與 sitemap 一律百分比編碼。"""
+    """檔案路徑 → 對外網址。檔名含中文，連結與 sitemap 一律百分比編碼。
+
+    去掉 `.html`：Cloudflare 靜態資產的 `auto-trailing-slash` 會把 /foo.html
+    301/307 導到 /foo，若連結與 sitemap 還寫 .html，等於每次瀏覽都多一跳。
+    落地檔名仍是 .html（用 *_path()），只有對外網址不帶。
+    """
+    if path.endswith(".html"):
+        path = path[: -len(".html")]
     return quote(path, safe="/-_.")
 
 
@@ -171,7 +178,7 @@ def main(argv: list[str]) -> int:
         return sorted(rows, key=lambda r: (-(r["recent_penalty_count"] or 0),
                                            -(r["penalty_count"] or 0), r["name"]))
 
-    urls = [{"path": "/", "priority": "1.0"}, {"path": "/about.html"}]
+    urls = [{"path": "/", "priority": "1.0"}, {"path": href("/about.html")}]
     files = 0
 
     # ---------- 機構頁 ----------
@@ -195,7 +202,8 @@ def main(argv: list[str]) -> int:
             neighbours=order(siblings)[:NEIGHBOUR_LIMIT],
             full_url=external(inst.get("url")), jsonld=jsonld_for(inst, url),
             map_url=map_link(inst),
-            coverage_from=coverage.get(inst["source"], as_of)[:4])
+            coverage_from=coverage.get(inst["source"], as_of)[:4],
+            canonical=href(path))
         for raw in dangerous_strings(inst, *rows, *alias_by_inst.get(inst["id"], [])):
             if raw in html:
                 escape_failures.append((path, raw[:60]))
@@ -211,7 +219,8 @@ def main(argv: list[str]) -> int:
                   "penalized": sum(1 for r in trows if r["recent_penalty_count"])}
                  for (c, town), trows in sorted(by_town.items()) if c == city]
         html = listing.render(heading=city, rows=order(rows), towns=towns, parent=None,
-                              penalized=sum(1 for r in rows if r["recent_penalty_count"]))
+                              penalized=sum(1 for r in rows if r["recent_penalty_count"]),
+                              canonical=href(city_path(city)))
         write(out / city_path(city).lstrip("/"), html)
         files += 1
         urls.append({"path": href(city_path(city)), "priority": "0.6"})
@@ -223,16 +232,17 @@ def main(argv: list[str]) -> int:
     for (city, town), rows in sorted(by_town.items()):
         html = listing.render(heading=f"{city}{town}", rows=order(rows), towns=None,
                               parent={"name": city, "url": href(city_path(city))},
-                              penalized=sum(1 for r in rows if r["recent_penalty_count"]))
+                              penalized=sum(1 for r in rows if r["recent_penalty_count"]),
+                              canonical=href(town_path(city, town)))
         write(out / town_path(city, town).lstrip("/"), html)
         files += 1
         urls.append({"path": href(town_path(city, town)), "priority": "0.5"})
 
     # ---------- 首頁、關於頁 ----------
     write(out / "index.html", env.get_template("index.html").render(
-        counts=meta["counts"], cities=city_cards))
+        counts=meta["counts"], cities=city_cards, canonical="/"))
     write(out / "about.html", env.get_template("about.html").render(
-        counts=meta["counts"], sources=meta["sources"]))
+        counts=meta["counts"], sources=meta["sources"], canonical=href("/about.html")))
     write(out / "404.html", env.get_template("404.html").render())
     files += 3
 
