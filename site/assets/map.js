@@ -85,8 +85,13 @@
   var STYLES = {
     penalty: { color: "#b23a2f", fill: "#b23a2f", opacity: 0.8, weight: 1 },
     clean: { color: "#2e9e5b", fill: "#2e9e5b", opacity: 0.4, weight: 2 },
-    vacant: { color: "#234e70", fill: "#234e70", opacity: 0.75, weight: 1 },
-    full: { color: "#7d94a4", fill: "#9bb0bf", opacity: 0.45, weight: 1 },
+    // 空位圖層的兩態。原本「有空位」用靛藍 #234e70——它對紙底其實有 7.7:1 的
+    // 對比，但跟站上的結構色與圖磚的水體同一個色相，讀起來像底圖的一部分而不是
+    // 資料標記。底圖已去飽和，飽和度是這裡唯一沒被佔用的通道，故改用高飽和亮藍。
+    // 已額滿的底色本來就淺，改以較粗邊框撐出輪廓——同時延續「實心／空心」這個
+    // 非色彩的區別管道，與裁罰圖層的紅實心／綠空心同一套邏輯。
+    vacant: { color: "#0b72d9", fill: "#0b72d9", opacity: 0.8, weight: 1 },
+    full: { color: "#5f7d91", fill: "#c3d3dd", opacity: 0.5, weight: 2 },
   };
 
   function marker(row, style, label) {

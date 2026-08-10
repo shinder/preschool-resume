@@ -140,10 +140,11 @@ a:hover { color: var(--seal); }
   display: inline-block; margin-inline-end: 0.3rem; vertical-align: -1px;
 }
 .legend .has { background: var(--seal); }
-.legend .none { background: #9bb0bf; }
+/* 已額滿：底色淺，靠邊框撐輪廓（與地圖標記同一套） */
+.legend .none { background: rgba(195, 211, 221, 0.5); border: 2px solid #5f7d91; }
 /* 空心環：色覺缺陷者靠形狀也分得出來 */
 .legend .clean { background: rgba(46, 158, 91, 0.2); border: 1.5px solid #2e9e5b; }
-.legend .open { background: var(--indigo); }
+.legend .open { background: #0b72d9; }
 
 /* ---------- 區段標題 ---------- */
 
