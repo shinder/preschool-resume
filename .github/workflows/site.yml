@@ -82,8 +82,12 @@ jobs:
             ${BASE_URL:+--base-url "$BASE_URL"} \
             ${{ inputs.index && '--index' || '' }}
 
+      # v3 預設裝 wrangler 3.90.0，那個版本還不支援「只有 assets、沒有 main」的
+      # 純靜態資產 Worker，會在認證之前就以 "Missing entry-point" 失敗
+      # （2026-08-10 首次排程實際踩到）。v4 的預設 wranglerVersion 是 "4"。
+      # 要退版之前先確認 wrangler.jsonc 是否仍然沒有 main。
       - name: 部署至 Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
