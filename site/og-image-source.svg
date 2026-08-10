@@ -31,10 +31,8 @@
     <text class="s" x="164" y="112" font-size="34" font-weight="700" fill="#1b2430"
           letter-spacing="4">幼兒園履歷</text>
 
-    <text class="s" x="84" y="292" font-size="62" font-weight="700" fill="#1b2430"
-          letter-spacing="1">官方公告到期就下架。</text>
-    <text class="s" x="84" y="376" font-size="62" font-weight="400" fill="#5a6875"
-          letter-spacing="1">這裡不會。</text>
+    <text class="s" x="84" y="336" font-size="56" font-weight="700" fill="#1b2430"
+          letter-spacing="1">希望小朋友有越來越好的成長學習環境</text>
 
     <line x1="84" y1="452" x2="1116" y2="452" stroke="#d4dce2" stroke-width="1"/>
 

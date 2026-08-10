@@ -90,8 +90,11 @@
     // 資料標記。底圖已去飽和，飽和度是這裡唯一沒被佔用的通道，故改用高飽和亮藍。
     // 已額滿的底色本來就淺，改以較粗邊框撐出輪廓——同時延續「實心／空心」這個
     // 非色彩的區別管道，與裁罰圖層的紅實心／綠空心同一套邏輯。
-    vacant: { color: "#0b72d9", fill: "#0b72d9", opacity: 0.8, weight: 1 },
-    full: { color: "#5f7d91", fill: "#c3d3dd", opacity: 0.5, weight: 2 },
+    // 有空位用全不透明：填色 0.8 時 #0b72d9 混合後只剩 3.13:1，已經貼著非文字
+    // 元素的 3:1 門檻，再亮就會掉下去。改為不透明後 #0f86f5 是 3.22:1——比原本
+    // 更亮、實際對比反而更好。代價是重疊的兩點會完全遮住彼此。
+    vacant: { color: "#0f86f5", fill: "#0f86f5", opacity: 1, weight: 1 },
+    full: { color: "#5f7d91", fill: "#c3d3dd", opacity: 0.5, weight: 3 },
   };
 
   function marker(row, style, label) {
