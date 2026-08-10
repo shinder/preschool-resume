@@ -139,6 +139,14 @@
       <section class="section">
         <h2>裁罰紀錄{% if penalties %}（近 {{ recent_years }} 年 {{ penalties|length }} 筆）{% endif %}</h2>
         {%- if penalties %}
+        {#- 近五年也可能有已下架的紀錄，而且常常是「較新的反而查不到」——公告期限
+            依處分輕重而定，輕罰比重罰早到期。同樣的說明原本只放在「更早的紀錄」
+            收合區塊裡，十筆都在近五年的頁面就完全看不到，看的人會以為資料錯了。 #}
+        {%- set recent_archived = penalties|selectattr("archived")|list|length %}
+        {%- if recent_archived %}
+        <p class="note">其中 {{ recent_archived }} 筆官方已無。公告期限依處分輕重而定（3 個月至 6 年），
+           輕罰比重罰早下架，所以較新的紀錄反而可能在官方網站查不到。本站保留供查證。</p>
+        {%- endif %}
         {{ ledger(penalties) }}
         {%- elif older %}
         <p class="empty">近 {{ recent_years }} 年查無裁罰紀錄。更早的紀錄見下方。</p>

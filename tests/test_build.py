@@ -173,6 +173,30 @@ def main():
         assert "<loc>https://example.workers.dev/city/%E8%87%BA%E5%8C%97%E5%B8%82</loc>" in sitemap
         assert ".html<" not in sitemap          # sitemap 也不得帶 .html，否則每筆都是一跳
 
+    # 近五年若有已下架紀錄，要就地說明「輕罰比重罰早下架」——這個說明原本只在
+    # 「更早的紀錄」收合區塊裡，十筆都在近五年的頁面完全看不到（實例：花蓮縣
+    # 私立何嘉仁幼兒園，3,000／6,000 元的輕罰已下架，60,000 元的重罰還在）
+    with tempfile.TemporaryDirectory() as tmp:
+        public, out = Path(tmp) / "public", Path(tmp) / "site"
+        public.mkdir()
+        payloads = json.loads(json.dumps(PUBLIC))       # 深拷貝，不污染其他案例
+        payloads["penalties.json"]["records"][0]["removed_at"] = "2026-07-01"
+        for name, payload in payloads.items():
+            (public / name).write_text(json.dumps(payload, ensure_ascii=False))
+        assert build.main(["--public", str(public), "--out", str(out)]) == 0
+        page = (out / "i/preschool-a.html").read_text()
+        assert "其中 1 筆官方已無" in page, "近五年有下架紀錄時要就地說明"
+        assert "輕罰比重罰早下架" in page
+
+    # 沒有下架紀錄時不該冒出這段說明
+    with tempfile.TemporaryDirectory() as tmp:
+        public, out = Path(tmp) / "public", Path(tmp) / "site"
+        public.mkdir()
+        for name, payload in PUBLIC.items():
+            (public / name).write_text(json.dumps(payload, ensure_ascii=False))
+        assert build.main(["--public", str(public), "--out", str(out)]) == 0
+        assert "筆官方已無。" not in (out / "i/babycare-CW1.html").read_text()
+
     # 逸出閘門：有人在模板加了 |safe 就要擋下來
     with tempfile.TemporaryDirectory() as tmp:
         public, out = Path(tmp) / "public", Path(tmp) / "site"
