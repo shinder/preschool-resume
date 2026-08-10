@@ -5,7 +5,7 @@
 {%- if inst.penalty_count -%}
 {{ inst.name }}（{{ inst.city }}{{ inst.town }}）共 {{ inst.penalty_count }} 筆裁罰紀錄，含官方已下架仍保留者，另附核定人數、收費與立案資料。
 {%- else -%}
-{{ inst.name }}（{{ inst.city }}{{ inst.town }}）目前查無裁罰紀錄，本頁提供核定人數、收費與立案等基本資料。
+{{ inst.name }}（{{ inst.city }}{{ inst.town }}）目前沒有裁罰紀錄。本頁提供核定人數、收費與立案等基本資料。
 {%- endif -%}
 {% endblock %}
 {% block head %}
@@ -151,7 +151,8 @@
         {%- elif older %}
         <p class="empty">近 {{ recent_years }} 年查無裁罰紀錄。更早的紀錄見下方。</p>
         {%- else %}
-        <p class="empty">目前查無裁罰紀錄。本站收錄自 {{ coverage_from }} 起的公告，含官方已下架者。</p>
+        <p class="empty">這家目前沒有裁罰紀錄。本站收錄自 {{ coverage_from }} 年起的公告、
+           <strong>含官方已下架的部分</strong>——這段期間查得到的都在這裡了。</p>
         {%- endif %}
 
         {%- if older %}

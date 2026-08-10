@@ -164,7 +164,10 @@ def main():
 
         # 無裁罰的機構頁要有實質內容與空狀態說明
         empty = (out / "i/babycare-CW1.html").read_text()
-        assert "目前查無裁罰紀錄" in empty and "核定收托" in empty
+        # 四分之三的機構頁沒有裁罰，這段空狀態要說清楚「沒查到」是有意義的結論，
+        # 而不是資料不全——這正是本站收錄下架公告的價值所在
+        assert "這家目前沒有裁罰紀錄" in empty and "核定收托" in empty
+        assert "含官方已下架的部分" in empty and "都在這裡了" in empty
 
         # 地圖點位：預設圖層放全部「現存」機構（沒被罰的也要看得到），件數為近五年
         allp = json.loads((out / "data/points-all.json").read_text())
