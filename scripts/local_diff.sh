@@ -17,10 +17,17 @@ DATA_DIR="${DATA_DIR:-$(dirname "$CODE_DIR")/preschool-resume-data}"
 LOG="${LOG:-$HOME/preschool-diff.log}"
 
 exec >> "$LOG" 2>&1
-echo "===== $(date '+%Y-%m-%d %H:%M:%S') 開始 ====="
 
-# 取最新程式碼與快照（今晨兩軌的 commit 都應已進來）
-git -C "$CODE_DIR" pull --ff-only --quiet || echo "警告：code pull 失敗，用現有版本"
+# 同 local_backup.sh：先 pull 程式碼，再以新版腳本重啟自己，
+# 否則改動當天這一輪跑的還是舊 inode 上的舊內容。
+if [ "${PRESCHOOL_RELAUNCHED:-}" != "1" ]; then
+  echo "===== $(date '+%Y-%m-%d %H:%M:%S') 開始 ====="
+  git -C "$CODE_DIR" pull --ff-only --quiet || echo "警告：code pull 失敗，用現有版本"
+  export PRESCHOOL_RELAUNCHED=1
+  exec bash "$0" "$@"
+fi
+
+# 取最新快照（今晨兩軌的 commit 都應已進來）
 git -C "$DATA_DIR" pull --rebase --quiet || echo "警告：data pull 失敗，用本地版本"
 
 python3 "$CODE_DIR/crawler/diff.py" --data-dir "$DATA_DIR"

@@ -23,10 +23,18 @@ DATA_DIR="${DATA_DIR:-$(dirname "$CODE_DIR")/preschool-resume-data}"
 LOG="${LOG:-$HOME/preschool-backup.log}"
 
 exec >> "$LOG" 2>&1
-echo "===== $(date '+%Y-%m-%d %H:%M:%S') 開始 ====="
 
-# 更新爬蟲程式碼與資料 repo（Actions 端的社家署 commit 可能先進來了）
-git -C "$CODE_DIR" pull --ff-only --quiet || echo "警告：code pull 失敗，用現有版本"
+# 本腳本會 pull 自己所在的 repo，所以必須先 pull、再用新版重新啟動自己。
+# 不重啟的話，改動當天那一輪跑的仍是舊腳本：git checkout 是寫暫存檔再 rename，
+# bash 開著的 fd 還指向舊 inode。實測 faaca31（改每日全量）在 2026-08-10 那輪
+# 沒生效，commit 訊息露了餡——「備份 2026-08-10（ece new-only）」、只跑 3 分鐘。
+if [ "${PRESCHOOL_RELAUNCHED:-}" != "1" ]; then
+  echo "===== $(date '+%Y-%m-%d %H:%M:%S') 開始 ====="
+  git -C "$CODE_DIR" pull --ff-only --quiet || echo "警告：code pull 失敗，用現有版本"
+  export PRESCHOOL_RELAUNCHED=1
+  exec bash "$0" "$@"
+fi
+
 git -C "$DATA_DIR" pull --rebase --quiet || echo "警告：data pull 失敗，用本地版本"
 
 python3 "$CODE_DIR/crawler/ece_moe.py" --data-dir "$DATA_DIR"
