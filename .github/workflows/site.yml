@@ -95,9 +95,11 @@ jobs:
       - name: 寫入心跳檔（供 watchdog 檢查）
         if: always()
         run: |
-          # 用 shell 判斷而非 ${{ ... && 0 || 1 }}：Actions 運算式裡 0 是 falsy，
-          # 成功時 `true && 0` 得到 0、再掉進 `|| 1`，於是心跳永遠寫 1，
-          # watchdog 永遠紅。（2026-08-10 首次部署成功才發現。）
+          # 用 shell 判斷成敗，不要用 Actions 運算式的「and 0 or 1」寫法：
+          # 運算式裡 0 是 falsy，成功時先得到 0、再掉進 or 分支拿到 1，
+          # 於是心跳不論成敗永遠寫 1，watchdog 永遠紅。
+          # （2026-08-10 首次部署成功才發現。註解裡也不能寫出那個運算式字面，
+          #  Actions 連 run 區塊的註解都會求值。）
           RC=0
           [ "${{ job.status }}" = "success" ] || RC=1
           mkdir -p data/status
