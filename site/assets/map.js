@@ -29,8 +29,21 @@
     return { z: z, lat: lat, lng: lng, mode: p[3] === "vacancy" ? "vacancy" : "penalty" };
   }
 
+  /* 觸控裝置的可點範圍：圓點半徑 8px（直徑 16px）遠小於行動裝置建議的
+     44px 觸控目標，手指常按不中。視覺尺寸只微幅放大（太大會蓋住街廓底圖、
+     密集區彼此相疊），主要靠 Canvas 繪圖器的 tolerance 把「可點擊範圍」
+     外擴——tolerance 是 Canvas 專屬選項，SVG 的點擊判定走瀏覽器 DOM，
+     吃不到這個外擴，所以繪圖器必須換成 Canvas（順帶讓上千個圓點少掉
+     等量的 DOM 節點）。粗指標下 10+12+邊框 ≈ 23px 半徑，達到 46px 目標；
+     滑鼠也給一點容差，貼著邊緣點不算失手。 */
+  var COARSE = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+  var RADIUS = COARSE ? 10 : 8;
+
   var view = readHash();
-  var map = L.map(el, { scrollWheelZoom: false });
+  var map = L.map(el, {
+    scrollWheelZoom: false,
+    renderer: L.canvas({ tolerance: COARSE ? 12 : 4 }),
+  });
   if (view) map.setView([view.lat, view.lng], view.z);
   else map.fitBounds(TW_BOUNDS);
   L.tileLayer("https://wmts.nlsc.gov.tw/wmts/EMAP16/default/GoogleMapsCompatible/{z}/{y}/{x}", {
@@ -80,7 +93,6 @@
     map.setView([v.lat, v.lng], v.z);
   });
 
-  var RADIUS = 8;
   var UNCLUSTER_ZOOM = 15;   // 此層級起不再聚合；聚合點擊最多帶到這裡
   var STYLES = {
     penalty: { color: "#b23a2f", fill: "#b23a2f", opacity: 0.8, weight: 1 },
