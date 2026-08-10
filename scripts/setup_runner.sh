@@ -9,11 +9,10 @@
 # 十分鐘能重建」——這支腳本就是那十分鐘。冪等，可重複執行。
 #
 # **搬到新機器前要先準備好的東西（腳本做不到的部分）**：
-#   1. 兩把 GitHub deploy key 的私鑰
-#        ~/.ssh/gh_preschool_code   程式 repo，唯讀即可
-#        ~/.ssh/gh_preschool_data   資料 repo，**需要寫入權限**
-#      舊機器如果是燒毀而非關機，私鑰會跟著沒有——請確認它們另有備份，
-#      否則就到 GitHub 的 repo Settings → Deploy keys 重新產生一對。
+#   1. 兩把 GitHub deploy key 的私鑰（~/.ssh/gh_preschool_code 與 gh_preschool_data）。
+#      **不需要事先備份**——舊機器燒毀也沒關係，直接跑
+#          bash scripts/rotate_deploy_keys.sh
+#      重新產生並登錄到 GitHub（deploy key 的權威在 GitHub，不在檔案裡）。
 #   2. 這台機器要有台灣 IP（家用網路或台灣 VPS 皆可）
 #
 # 用法：bash scripts/setup_runner.sh [--dry-run]
@@ -45,7 +44,7 @@ case "$PYV" in
 esac
 for k in gh_preschool_code gh_preschool_data; do
   # ${k} 的大括號不能省：locale 非 UTF-8 時 bash 會把後面的中文位元組併進變數名
-  [ -f "$HOME/.ssh/$k" ] || die "缺私鑰 ~/.ssh/${k}（見本檔開頭說明）"
+  [ -f "$HOME/.ssh/$k" ] || die "缺私鑰 ~/.ssh/${k}——先跑 bash scripts/rotate_deploy_keys.sh 產生並登錄"
   run "chmod 600 '$HOME/.ssh/$k'"
 done
 

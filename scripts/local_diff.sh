@@ -40,7 +40,7 @@ mkdir -p status
 printf '{"date": "%s", "exit": %d}\n' "$(TZ=Asia/Taipei date +%F)" "$RC" > status/diff.json
 
 if [ $RC -ne 0 ]; then
-  echo "diff 引擎異常（exit=$RC），只推心跳不 commit 產出"
+  echo "diff 引擎異常（exit=${RC}），只推心跳不 commit 產出"
   git add status
 else
   git add data events status
@@ -49,7 +49,7 @@ fi
 if git diff --cached --quiet; then
   echo "無任何變更（同日重跑）"
 elif git diff --cached --quiet -- . ':!status'; then
-  git commit -q -m "心跳 $(TZ=Asia/Taipei date +%F)（diff exit=$RC）"
+  git commit -q -m "心跳 $(TZ=Asia/Taipei date +%F)（diff exit=${RC}）"
   git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
 else
   git commit -q -m "解析 $(date +%Y-%m-%d)：penalties 現況與事件"
