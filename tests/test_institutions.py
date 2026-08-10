@@ -238,6 +238,12 @@ def main():
         write_sources(d, all20[:5], [babycare(1)])
         assert run(d, "2026-08-11") == 1
 
+        # 換主鍵規則時整批 id 對不上，不可把舊主檔複製成墓碑（每家多一個分身）
+        renamed = [preschool(i, reg_no=f"新規則字第{i}號") for i in range(20)]
+        write_sources(d, renamed, [babycare(1)])
+        assert run(d, "2026-08-11") == 1
+        assert len(json.loads(hist.read_text())["records"]) == 1   # 墓碑名冊未被汙染
+
         # 復業 → 移出墓碑名冊，欄位以最新爬到的為準
         write_sources(d, all20, [babycare(1)])
         assert run(d, "2026-08-12") == 0

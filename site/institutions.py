@@ -382,7 +382,7 @@ def load_payload(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def carry_forward(live: list[dict], data_dir: Path, as_of: str) -> list[dict]:
+def carry_forward(live: list[dict], data_dir: Path, as_of: str) -> list[dict] | None:
     """墓碑名冊：曾經在站方名冊上、現已不在的幼兒園。
 
     需要它是因為裁罰活得比園所久——站方的基本資料查詢只列現存園，但已停辦或
@@ -398,9 +398,20 @@ def carry_forward(live: list[dict], data_dir: Path, as_of: str) -> list[dict]:
     # 那才是它最後一次真的還在名冊上的日期（種子紀錄我方沒見過，留 None）。
     prev = load_payload(data_dir / "data" / "institutions.json")
     last_seen = prev.get("as_of") or as_of
-    for r in prev.get("records", []):
-        if r.get("kind") == "preschool" and r["id"] not in live_ids:
-            carried.setdefault(r["id"], dict(r, is_active=False, last_seen=last_seen))
+    prev_preschools = [r for r in prev.get("records", []) if r.get("kind") == "preschool"]
+    vanished = [r for r in prev_preschools
+                if r["id"] not in live_ids and r["id"] not in carried]
+    # 一次消失一大批不會是真的關了那麼多家，只可能是爬蟲半殘、或主鍵規則變了
+    # （舊主檔的 id 算法不同，整批對不上）。後者放過去會把整份舊主檔複製成
+    # 墓碑，每家園多出一個「已停辦」分身。縮水門檻擋不住這件事——墓碑讓總數
+    # 不減反增，而換規則時現存數根本沒少。
+    if prev_preschools and len(vanished) > max(5, len(prev_preschools) * MAX_SHRINK_RATE):
+        log(f"中止：上一版 {len(prev_preschools):,} 家幼兒園有 {len(vanished):,} 家"
+            f"在本次名冊中消失。可能是爬蟲半殘，或主鍵規則改變。"
+            f"若確實換了主鍵規則，請先刪除 data/institutions.json 再重跑。")
+        return None
+    for r in vanished:
+        carried[r["id"]] = dict(r, is_active=False, last_seen=last_seen)
     # 重新出現在名冊上的園（復業、或站方漏列後補回）不再是墓碑
     tombstones = [r for i, r in carried.items() if i not in live_ids]
     return sorted(tombstones, key=lambda r: r["id"])
@@ -463,6 +474,8 @@ def main(argv: list[str]) -> int:
     records, issues, counts = [], [], {}
     built = build_preschool(schools, issues)
     tombstones = carry_forward(built, data_dir, as_of)
+    if tombstones is None:
+        return 1
     records.extend(built)
     records.extend(tombstones)
     log(f"preschool：主檔 {len(schools):,} 筆 → 入庫 {len(built):,} 筆"
