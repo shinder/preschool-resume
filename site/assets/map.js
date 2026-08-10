@@ -81,6 +81,7 @@
   });
 
   var RADIUS = 8;
+  var UNCLUSTER_ZOOM = 15;   // 此層級起不再聚合；聚合點擊最多帶到這裡
   var STYLES = {
     penalty: { color: "#b23a2f", fill: "#b23a2f", opacity: 0.8, weight: 1 },
     clean: { color: "#2e9e5b", fill: "#2e9e5b", opacity: 0.4, weight: 2 },
@@ -102,9 +103,13 @@
     return L.markerClusterGroup({
       chunkedLoading: true,
       maxClusterRadius: 55,
-      spiderfyOnMaxZoom: true,
+      // 點擊行為自己接管（見 bindClusterClick），關掉套件的兩個預設：
+      // 內建的 zoomToBounds 對「小而密」的叢集會算不出該去哪一級而原地不動，
+      // 實測點計數 2 的叢集完全沒反應——不放大也沒展開。
+      spiderfyOnMaxZoom: false,
+      zoomToBoundsOnClick: false,
       // 放大到街廓層級就全部攤開，否則綠點永遠躲在叢集裡看不到
-      disableClusteringAtZoom: 15,
+      disableClusteringAtZoom: UNCLUSTER_ZOOM,
       iconCreateFunction: function (c) {
         var n = c.getChildCount();
         var size = n < 10 ? "small" : n < 100 ? "medium" : "large";
@@ -114,6 +119,16 @@
           iconSize: new L.Point(40, 40),
         });
       },
+    });
+  }
+
+  /* 聚合點擊：一律至少放大一級，最多到 UNCLUSTER_ZOOM（該層級所有標記都攤開）。
+     大叢集依子點範圍逐級靠近，小叢集直接跳到攤開層級——後者正是內建行為失效的
+     情況：兩三個點擠在一起時算不出中間層級，於是原地不動，使用者只覺得點了沒用。*/
+  function bindClusterClick(group) {
+    group.on("clusterclick", function (e) {
+      var fit = map.getBoundsZoom(e.layer.getBounds());
+      map.setView(e.latlng, Math.max(map.getZoom() + 1, Math.min(fit, UNCLUSTER_ZOOM)));
     });
   }
 
@@ -130,6 +145,7 @@
 
   function draw(rows, build) {
     var group = cluster();
+    bindClusterClick(group);
     rows.forEach(function (row) { group.addLayer(build(row)); });
     if (current) map.removeLayer(current);
     current = group;
