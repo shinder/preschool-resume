@@ -1,0 +1,88 @@
+# 解析＋diff 事件產出（工程執行計劃 2.2）
+#
+# 原本跑在 old-mini 的 systemd timer，2026-08-10 搬到 Actions。
+#
+# 搬遷理由：這一軌**不碰任何政府網站**，只讀寫資料 repo，沒有留在 old-mini 的
+# 必要。留在那裡的代價是耦合——old-mini 一掛，連社家署那半邊也跟著凍住：
+# 社家署備份在 Actions 仍正常收集，卻因為 diff 停擺而永遠進不了站台。
+# 搬走之後 old-mini 只剩「非台灣 IP 不可」的工作（教保網封境外 IP）。
+#
+# 仍然是單點執行——當初放 old-mini 的理由是避免兩處同時改 penalties.json，
+# 改成 Actions 一樣只有一個執行點，該理由仍然成立。
+# **老機器上的 preschool-diff.timer 必須停用**，否則兩邊會打架。
+#
+# 時序：社家署備份（Actions 05:30）與教保網備份（old-mini 06:30，全量約一小時）
+# 都完成之後才跑；產出供 site.yml（09:00）建站使用。
+#
+# diff.py 的安全機制：解析有任何失敗、或單次 removed 異常量，都會 exit 1 且
+# 不寫檔——此時只推心跳、不 commit 產出，異常留在 Actions log 裡等人工處理。
+
+name: diff
+
+on:
+  schedule:
+    - cron: "30 0 * * *" # UTC 00:30 ＝ 台北 08:30
+  workflow_dispatch:
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v5
+
+      # raw/sfaa/files 是 317MB 的公告 PDF，解析用不到，排除掉；
+      # 其餘 raw/*（ece_schools、ncwis、kiang）也與本軌無關。
+      - name: Checkout 資料 repo
+        uses: actions/checkout@v5
+        with:
+          repository: shinder/preschool-resume-data
+          ssh-key: ${{ secrets.DATA_REPO_SSH_KEY }}
+          path: data
+          sparse-checkout: |
+            data
+            events
+            status
+            raw/ece
+            raw/sfaa/list
+            raw/sfaa/detail
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # diff.py 只用標準函式庫，不必 pip install
+      - name: 解析與 diff
+        id: run
+        run: |
+          set +e
+          python3 crawler/diff.py --data-dir data
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      - name: 提交產出與心跳
+        if: always()
+        run: |
+          RC="${{ steps.run.outputs.rc }}"
+          [ -n "$RC" ] || RC=1
+          cd data
+          mkdir -p status
+          printf '{"date": "%s", "exit": %d}\n' "$(TZ=Asia/Taipei date +%F)" "$RC" > status/diff.json
+          git config user.name "diff-bot"
+          git config user.email "shinder.lin@gmail.com"
+          if [ "$RC" -ne 0 ]; then
+            echo "diff 引擎異常（exit=$RC），只推心跳不 commit 產出"
+            git add status
+          else
+            git add data events status
+          fi
+          if git diff --cached --quiet; then
+            echo "無任何變更（同日重跑）"
+          elif git diff --cached --quiet -- . ':!status'; then
+            git commit -q -m "心跳 $(TZ=Asia/Taipei date +%F)（diff exit=$RC）"
+            git pull --rebase --quiet && git push -q
+          else
+            git commit -q -m "解析 $(TZ=Asia/Taipei date +%F)：penalties 現況與事件"
+            git pull --rebase --quiet && git push -q
+          fi
+          exit "$RC"
