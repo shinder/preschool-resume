@@ -116,6 +116,30 @@ def main():
         assert ('<link rel="canonical" href="https://example.workers.dev/i/preschool-a">'
                 in page), "缺少 canonical"
 
+        # 結構化資料必須真的能被 JSON.parse——script 內容是純文字，HTML 實體
+        # 不會被解碼，若交給 Jinja 自動逸出，&#34; 會原樣留著而解析失敗
+        # （線上曾經就是這樣壞掉的，肉眼看 HTML 完全看不出來）
+        import re as _re
+        blocks = _re.findall(r'<script type="application/ld\+json">(.*?)</script>', page, _re.S)
+        assert len(blocks) == 2, f"應有 Preschool 與 BreadcrumbList 兩段，實得 {len(blocks)}"
+        types = []
+        for b in blocks:
+            types.append(json.loads(b)["@type"])          # 解析失敗就直接爆
+        assert types == ["Preschool", "BreadcrumbList"], types
+        crumb = json.loads(blocks[1])["itemListElement"]
+        assert [c["name"] for c in crumb] == ["全台", "臺北市", "中正區", NASTY], crumb
+        assert crumb[1]["item"] == "https://example.workers.dev/city/%E8%87%BA%E5%8C%97%E5%B8%82"
+        assert "item" not in crumb[-1]                     # 末項是當前頁
+        # 危險字元一律走 JSON 的 \u 逸出，不得原樣出現（否則 </script> 可提前收尾）
+        assert "\\u003cscript" in blocks[0] and "<script>alert" not in blocks[0]
+
+        # 分享預覽與 favicon
+        assert '<meta property="og:title" content="' in page
+        assert '<meta property="og:url" content="https://example.workers.dev/i/preschool-a">' in page
+        assert '<meta name="twitter:card" content="summary">' in page
+        assert '<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">' in page
+        assert (out / "assets/favicon.svg").exists()
+
         # 6a 全站 noindex，且 robots 仍允許檢索（擋掉就讀不到 noindex）
         assert '<meta name="robots" content="noindex, nofollow">' in page
         assert "Disallow" not in (out / "robots.txt").read_text()

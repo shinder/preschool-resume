@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ heading }}的幼兒園與托嬰中心｜幼兒園履歷{% endblock %}
 {% block description %}{{ heading }}收錄 {{ rows|length }} 家幼兒園與托嬰中心，其中 {{ penalized }} 家有裁罰紀錄。{% endblock %}
+{% block head %}
+<script type="application/ld+json">{{ breadcrumb|safe }}</script>
+{%- endblock %}
 
 {% block main %}
 <div class="wrap">

@@ -72,6 +72,21 @@ def map_link(inst: dict) -> str | None:
     return f"https://www.google.com/maps/search/?api=1&query={quote(q)}" if q else None
 
 
+def jsonld_dump(data: dict) -> str:
+    """序列化為可直接嵌進 <script type="application/ld+json"> 的字串。
+
+    模板必須用 `|safe` 輸出：script 元素的內容是純文字，HTML 實體不會被解碼，
+    交給 Jinja 自動逸出的話 `&#34;` 會原樣留著，JSON 就解析不了
+    （2026-08-10 發現線上的結構化資料一直是壞的，就是這個原因）。
+
+    因此改由這裡負責安全性：把 DANGEROUS 那四個字元全部轉成 JSON 的 \\u 逸出。
+    `<` 防的是提前關閉 script 標籤；`&`／`>` 則是為了讓 build 的逸出掃描仍然
+    有意義——含這些字元的原始字串不會原樣出現在產物裡。`"` 由 json 自己處理。
+    """
+    return (json.dumps(data, ensure_ascii=False)
+            .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
+
+
 def jsonld_for(inst: dict, url: str) -> str:
     data = {
         "@context": "https://schema.org",
@@ -89,8 +104,22 @@ def jsonld_for(inst: dict, url: str) -> str:
                        "latitude": inst["lat"], "longitude": inst["lng"]}
     if inst.get("phone"):
         data["telephone"] = inst["phone"]
-    # 內嵌於 <script>，把 < 轉義避免提前關閉標籤
-    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+    return jsonld_dump(data)
+
+
+def breadcrumb_jsonld(items: list[tuple[str, str | None]], base_url: str) -> str:
+    """麵包屑結構化資料。畫面上本來就有「全台／縣市／鄉鎮」導覽，補這段是為了
+    讓搜尋結果顯示成路徑而非裸網址。末項是當前頁，依慣例不給 item。"""
+    data = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": i, "name": name,
+             **({"item": base_url + url} if url else {})}
+            for i, (name, url) in enumerate(items, 1)
+        ],
+    }
+    return jsonld_dump(data)
 
 
 def dangerous_strings(*records) -> list[str]:
@@ -203,7 +232,13 @@ def main(argv: list[str]) -> int:
             full_url=external(inst.get("url")), jsonld=jsonld_for(inst, url),
             map_url=map_link(inst),
             coverage_from=coverage.get(inst["source"], as_of)[:4],
-            canonical=href(path))
+            canonical=href(path),
+            breadcrumb=breadcrumb_jsonld(
+                [("全台", "/")]
+                + ([(inst["city"], href(city_path(inst["city"])))] if inst.get("city") else [])
+                + ([(inst["town"], href(town_path(inst["city"], inst["town"])))]
+                   if inst.get("town") else [])
+                + [(inst["name"], None)], base_url))
         for raw in dangerous_strings(inst, *rows, *alias_by_inst.get(inst["id"], [])):
             if raw in html:
                 escape_failures.append((path, raw[:60]))
@@ -220,7 +255,9 @@ def main(argv: list[str]) -> int:
                  for (c, town), trows in sorted(by_town.items()) if c == city]
         html = listing.render(heading=city, rows=order(rows), towns=towns, parent=None,
                               penalized=sum(1 for r in rows if r["recent_penalty_count"]),
-                              canonical=href(city_path(city)))
+                              canonical=href(city_path(city)),
+                              breadcrumb=breadcrumb_jsonld(
+                                  [("全台", "/"), (city, None)], base_url))
         write(out / city_path(city).lstrip("/"), html)
         files += 1
         urls.append({"path": href(city_path(city)), "priority": "0.6"})
@@ -233,7 +270,10 @@ def main(argv: list[str]) -> int:
         html = listing.render(heading=f"{city}{town}", rows=order(rows), towns=None,
                               parent={"name": city, "url": href(city_path(city))},
                               penalized=sum(1 for r in rows if r["recent_penalty_count"]),
-                              canonical=href(town_path(city, town)))
+                              canonical=href(town_path(city, town)),
+                              breadcrumb=breadcrumb_jsonld(
+                                  [("全台", "/"), (city, href(city_path(city))),
+                                   (town, None)], base_url))
         write(out / town_path(city, town).lstrip("/"), html)
         files += 1
         urls.append({"path": href(town_path(city, town)), "priority": "0.5"})

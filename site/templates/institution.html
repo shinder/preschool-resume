@@ -9,7 +9,10 @@
 {%- endif -%}
 {% endblock %}
 {% block head %}
-<script type="application/ld+json">{{ jsonld }}</script>
+{#- |safe 是必要的：script 內容是純文字，Jinja 的 HTML 逸出會讓 JSON 解析不了。
+    安全性改由 build.jsonld_dump() 負責（< > & 全部轉成 \u 逸出）。 #}
+<script type="application/ld+json">{{ jsonld|safe }}</script>
+<script type="application/ld+json">{{ breadcrumb|safe }}</script>
 {%- endblock %}
 
 {% block main %}
