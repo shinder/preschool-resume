@@ -120,10 +120,13 @@ def main():
         empty = (out / "i/babycare-CW1.html").read_text()
         assert "目前查無裁罰紀錄" in empty and "核定收托" in empty
 
-        # 地圖點位：預設只給有裁罰者
+        # 地圖點位：預設圖層放全部「現存」機構（沒被罰的也要看得到），件數為近五年
         allp = json.loads((out / "data/points-all.json").read_text())
-        # 預設圖層放全部機構（沒被罰的也要看得到），件數為近五年
-        assert len(allp["rows"]) == 3
+        assert len(allp["rows"]) == 2
+        # 已停辦者不上圖——墓碑名冊是為了接住改名／借殼的裁罰歷史，不是要展示
+        assert not [r for r in allp["rows"] if r[4] == "preschool-b"], allp["rows"]
+        # 但機構頁與列表頁仍然保留，並掛「已停辦」徽章
+        assert "已停辦" in (out / "i/preschool-b.html").read_text()
         hit = [r for r in allp["rows"] if r[2]]
         assert len(hit) == 1 and hit[0][2] == 1
         assert hit[0][4] == "preschool-a"          # 網址片段，前端補 /i/ 與 .html

@@ -254,7 +254,13 @@ def main(argv: list[str]) -> int:
                 inst["name"], slug(inst), inst["capacity_approved"],
                 inst["enrolled"], inst.get("enrolled_as_of")]
 
-    located = [i for i in institutions if i.get("lng") is not None]
+    # 已停辦者不上地圖：墓碑名冊的用途是接住改名／借殼的裁罰歷史（見
+    # institutions.carry_forward），不是要在圖上展示一家已經不存在的園。
+    # 機構頁與列表頁仍然保留它們，並掛「已停辦」徽章。
+    located = [i for i in institutions
+               if i.get("lng") is not None and i.get("is_active", True)]
+    closed = sum(1 for i in institutions
+                 if i.get("lng") is not None and not i.get("is_active", True))
     penalized = [i for i in located if i.get("recent_penalty_count")]
     # 缺額圖層：只有托嬰中心有實際收托數
     with_vacancy = [i for i in located if i.get("vacancy") is not None]
@@ -286,8 +292,8 @@ def main(argv: list[str]) -> int:
 
     log(f"產出 {files:,} 檔於 {out}：機構 {len(institutions):,}、"
         f"縣市 {len(city_cards)}、鄉鎮市區 {len(by_town)}；"
-        f"地圖點位 {len(located):,}（近五年有裁罰 {len(penalized):,}）、"
-        f"缺額圖層 {len(with_vacancy):,}"
+        f"地圖點位 {len(located):,}（近五年有裁罰 {len(penalized):,}；"
+        f"已停辦 {closed:,} 家不上圖）、缺額圖層 {len(with_vacancy):,}"
         f"（有空位 {sum(1 for i in with_vacancy if i['vacancy'] > 0):,}）")
     if noindex:
         log("全站掛 noindex（6a）；6b 掛正式網域時加 --index")
