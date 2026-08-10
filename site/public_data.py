@@ -35,6 +35,8 @@ INSTITUTION_FIELDS = (
     "address", "lng", "lat", "phone", "url", "org_type", "capacity_approved",
     "enrolled", "pre_public", "free5", "after_school", "shuttle", "monthly_fee",
     "floor", "area_indoor", "area_outdoor", "reg_no", "reg_date", "is_active",
+    # 幼兒園自建主檔（ece_schools）才有的欄位
+    "reg_id", "evaluations",
     # 托嬰中心主檔（ncwis）才有的欄位。負責人姓名（owner）刻意不在此列。
     "grade", "grade_year", "area_total", "safety_public", "safety_fire",
     "staff", "fees", "fee_mode", "refund_note", "note_name", "enrolled_as_of",
@@ -277,8 +279,10 @@ def main(argv: list[str]) -> int:
                  "https://crc.sfaa.gov.tw/ChildYoungLaw/Sanction"},
                 {"name": "托嬰中心基本資料、評鑑與收費：托育媒合平臺（衛福部社家署）",
                  "url": "https://ncwisweb.sfaa.gov.tw/home/childcare-center"},
-                {"name": "幼兒園基本資料與地圖座標：kiang 開放資料（MIT）", "url":
-                 "https://github.com/kiang"},
+                {"name": "幼兒園基本資料、評鑑與地圖座標：全國教保資訊網（教育部）",
+                 "url": "https://ap.ece.moe.edu.tw/webecems/"},
+                {"name": "托嬰中心名冊底稿：kiang 開放資料（MIT）", "url":
+                 "https://github.com/kiang/ncwisweb.sfaa.gov.tw"},
             ],
             "notice": "自然人裁罰不予公開；公文所載姓名一律遮罩。",
         },

@@ -1,14 +1,29 @@
-"""機構主檔（工程執行計劃 6.1）：自 kiang 的 MIT 開放資料建立機構主檔。
+"""機構主檔（工程執行計劃 6.1）：幼兒園自建主檔，托嬰中心以 kiang 為底。
 
-地圖需要機構維度與座標，而我方 penalties.json 只到縣市／區層級。kiang 已有
-兩份含座標的 MIT GeoJSON，直接引用可省去自建主檔爬蟲與地理編碼：
+地圖需要機構維度與座標，而我方 penalties.json 只到縣市／區層級。
 
-- 幼兒園：kiang/ap.ece.moe.edu.tw 的 docs/preschools.json（7,664 家）
-- 托嬰中心：kiang/ncwisweb.sfaa.gov.tw 的 docs/babycare.json（2,045 家）
+- 幼兒園：`crawler/ece_schools.py` 自教保網抓的 `data/ece/schools.json`。
+  原本用 kiang/ap.ece.moe.edu.tw 的 docs/preschools.json，已於 2026-08-10 換掉，
+  理由見下方「幼兒園主鍵」。
+- 托嬰中心：kiang/ncwisweb.sfaa.gov.tw 的 docs/babycare.json（2,045 家）為底，
+  再由 `crawler/ncwis_centers.py` 的站方主檔覆蓋與補欄（見 NCWIS_OVERLAY）。
 
-兩份皆自 raw.githubusercontent.com 取得，與 2.4 回補同樣不觸及 kiang 自家
+kiang 那份自 raw.githubusercontent.com 取得，與 2.4 回補同樣不觸及 kiang 自家
 伺服器。原檔一併快照到 raw/kiang/ 並記錄 sha256：上游若停更或消失，主檔仍可
 重放（沿用「先備份、後解析」原則）。
+
+**幼兒園主鍵**（2026-08-10 全量 7,664 筆實測後定案）：
+`digest(縣市 + reg_no + 園名)` 單層雜湊，不做「撞號才延伸」的兩層設計。
+
+- kiang 的 UUID 是內容衍生的（改名就換一顆、舊紀錄不刪），本來就不能沿用。
+- `reg_id`（重發證書字號）一年內變動 820 家（10.9%），含它的 id 會大規模崩掉。
+- `reg_no`（最初設立許可文號）一年零變動，但**單獨不唯一**：撞號組涵蓋 1,527 筆
+  （20%）——雲林 19 家鄉鎮立幼兒園共用一張文號，分班一律沿用母園文號。
+- 三欄合起來實測 0 撞號。改採單層是為了避免跨紀錄耦合：兩層設計下，一家新園
+  共用某張文號就會讓既有那家從基本雜湊翻成延伸雜湊，id 因別人的變動而改變。
+  代價是改名就換 id，但實測改名率上限僅約 0.7%/年，遠小於 20%。
+- 日後若真要保住改名前的網址，可另加「改名登錄表」以 (縣市, reg_no) 認出改名
+  並沿用舊 id；那是純 override，不會動到沒改名的園。
 
 **個資注意**：幼兒園紀錄含 `owner`（負責人姓名）。依第十節分層原則，此欄位
 只供內部歸戶與「同負責人另營機構」的不具名關聯運算，**不得進入公開層**——
@@ -23,7 +38,8 @@ import hashlib
 import json
 import re
 import sys
-from collections import Counter
+import unicodedata
+from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
 
@@ -34,8 +50,6 @@ from common import Fetcher, log  # noqa: E402
 RAW_BASE = "https://raw.githubusercontent.com/kiang"
 SOURCES = (
     # kind, source（對應 penalty.source）, url, 快照檔名
-    ("preschool", "ece", f"{RAW_BASE}/ap.ece.moe.edu.tw/master/docs/preschools.json",
-     "preschools.json"),
     ("babycare", "sfaa", f"{RAW_BASE}/ncwisweb.sfaa.gov.tw/master/docs/babycare.json",
      "babycare.json"),
 )
@@ -45,8 +59,6 @@ TW_BBOX = (118.0, 21.5, 122.2, 26.5)
 
 # 托嬰中心地址格式："231新北市新店區中央里中央一街20號1樓"
 ADDR_RE = re.compile(r"^(?P<zip>\d{3,6})?\s*(?P<city>..[市縣])(?P<town>.{1,4}?[鄉鎮市區])")
-# 幼兒園地址格式："[701]中華東路二段185巷14號"（縣市／區另存欄位）
-BRACKET_ZIP_RE = re.compile(r"^\[(\d{3,6})\]\s*")
 
 # 品質門檻：超過即 exit 1，讓排程失敗（比照 diff.py 的涵蓋率告警）
 MAX_ISSUE_RATE = 0.01
@@ -68,16 +80,17 @@ def as_int(v) -> int | None:
     return int(v) if v.isdigit() else None
 
 
-def coords(feature: dict, issues: list, iid: str, name: str) -> tuple[float, float] | None:
-    """取出並驗證座標。上游有 4 筆以字串存經緯度，一併正規化為 float。"""
-    c = (feature.get("geometry") or {}).get("coordinates")
-    if not c or len(c) < 2:
+def check_coords(raw_lng, raw_lat, issues: list, iid: str,
+                 name: str) -> tuple[float, float] | None:
+    """驗證一組經緯度。上游有 4 筆以字串存，一併正規化為 float。"""
+    if raw_lng is None or raw_lat is None:
         issues.append({"id": iid, "name": name, "issue": "無座標"})
         return None
     try:
-        lng, lat = float(c[0]), float(c[1])
+        lng, lat = float(raw_lng), float(raw_lat)
     except (TypeError, ValueError):
-        issues.append({"id": iid, "name": name, "issue": f"座標無法解析：{c!r}"})
+        issues.append({"id": iid, "name": name,
+                       "issue": f"座標無法解析：{raw_lng!r},{raw_lat!r}"})
         return None
     x0, y0, x1, y1 = TW_BBOX
     if not (x0 <= lng <= x1 and y0 <= lat <= y1):
@@ -86,57 +99,114 @@ def coords(feature: dict, issues: list, iid: str, name: str) -> tuple[float, flo
     return lng, lat
 
 
+def coords(feature: dict, issues: list, iid: str, name: str) -> tuple[float, float] | None:
+    c = (feature.get("geometry") or {}).get("coordinates")
+    if not c or len(c) < 2:
+        issues.append({"id": iid, "name": name, "issue": "無座標"})
+        return None
+    return check_coords(c[0], c[1], issues, iid, name)
+
+
 def base_record(kind: str, source: str, native_id: str, name: str,
-                lnglat: tuple[float, float] | None) -> dict:
+                lnglat: tuple[float, float] | None, origin: str = "kiang") -> dict:
     return {
         "id": f"{kind}:{native_id}",
         "kind": kind,
         "source": source,      # 對應 penalty.source，供 6.2 對照
         "native_id": native_id,
         "name": name,
-        "origin": "kiang",
+        "origin": origin,
         "lng": lnglat[0] if lnglat else None,
         "lat": lnglat[1] if lnglat else None,
     }
 
 
-def build_preschool(features: list[dict], issues: list) -> list[dict]:
-    out = []
-    for f in features:
-        p = f["properties"]
-        native_id, name = p.get("id"), clean(p.get("title")) or ""
-        iid = f"preschool:{native_id}"
-        if not native_id or not name:
-            issues.append({"id": iid, "name": name, "issue": "缺 id 或園名"})
+def norm_key(s: str | None) -> str:
+    """雜湊前的正規化。站方的全形／半形括號與「台／臺」會隨時間飄動（實測
+    「昌福非營利幼兒園(委託…)」與「（委託…）」兩種寫法一年內就變過），
+    不吸收掉的話 id 會因為純排版差異而改變。"""
+    s = unicodedata.normalize("NFKC", (s or "").strip()).replace("台", "臺")
+    return re.sub(r"\s+", "", s)
+
+
+def _digest(*parts: str) -> str:
+    return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def assign_preschool_ids(rows: list[dict], issues: list) -> dict[int, str]:
+    """幼兒園主鍵：digest(縣市 + reg_no + 園名)，見模組 docstring。
+
+    實測全量 0 撞號，但仍留確定性的保底：真撞上就依序追加未正規化園名、
+    鄉鎮、序號。只在撞號組內生效，不像兩層設計那樣常態影響五分之一的紀錄。
+    """
+    base = {i: _digest(norm_key(r.get("city")), norm_key(r.get("reg_no")),
+                       norm_key(r.get("name"))) for i, r in enumerate(rows)}
+    groups = defaultdict(list)
+    for i, d in base.items():
+        groups[d].append(i)
+
+    out = {}
+    for digest, idxs in groups.items():
+        if len(idxs) == 1:
+            out[idxs[0]] = digest
             continue
+        for seq, i in enumerate(sorted(idxs, key=lambda j: (rows[j].get("town") or "",
+                                                            rows[j].get("name") or "", j))):
+            r = rows[i]
+            out[i] = _digest(digest, r.get("name") or "", r.get("town") or "", str(seq))
+            issues.append({"id": f"preschool:{out[i]}", "name": r.get("name") or "",
+                           "issue": f"主鍵撞號（縣市+reg_no+園名 相同），延伸為第 {seq} 筆",
+                           "gating": False})
+    return out
+
+
+def build_preschool(schools: list[dict], issues: list) -> list[dict]:
+    """吃 `crawler/ece_schools.py` 的 data/ece/schools.json。
+
+    站方的基本資料查詢只列現存園所，故 is_active 一律 True；kiang 那份是
+    累積不刪的（含 319 家已停辦），這也是換源後家數會少一些的原因。
+    """
+    rows = [r for r in schools if clean(r.get("name"))]
+    for r in schools:
+        if not clean(r.get("name")):
+            issues.append({"id": "preschool:?", "name": "", "issue": "缺園名"})
+    ids = assign_preschool_ids(rows, issues)
+
+    out = []
+    for i, p in enumerate(rows):
+        native_id, name = ids[i], clean(p.get("name"))
+        iid = f"preschool:{native_id}"
         city, town = clean(p.get("city")), clean(p.get("town"))
-        street = clean(p.get("address")) or ""
-        m = BRACKET_ZIP_RE.match(street)
-        postal, street = (m.group(1), street[m.end():]) if m else (None, street)
-        if not street:
+        if not clean(p.get("address")):
             issues.append({"id": iid, "name": name, "issue": "無地址"})
         r = base_record("preschool", "ece", native_id, name,
-                        coords(f, issues, iid, name))
+                        check_coords(p.get("lng"), p.get("lat"), issues, iid, name),
+                        origin="ece")
         r.update({
             "city": city,
             "town": town,
-            "postal_code": postal,
-            "address": "".join(filter(None, (city, town, street))) or None,
-            "phone": clean(p.get("tel")),
+            "postal_code": clean(p.get("postal_code")),
+            "address": clean(p.get("address")),
+            "phone": clean(p.get("phone")),
             "url": clean(p.get("url")),
-            "org_type": clean(p.get("type")),            # 公立／私立／非營利
-            "capacity_approved": as_int(p.get("count_approved")),  # 核定人數
+            "org_type": clean(p.get("org_type")),        # 公立／私立／非營利
+            "capacity_approved": as_int(p.get("capacity_approved")),
             "pre_public": clean(p.get("pre_public")),    # 準公共化資格年度
-            "free5": clean(p.get("is_free5")),           # 五歲免學費
-            "after_school": clean(p.get("is_after")),    # 課後留園
+            # 五歲免學費與月費參考只在收費明細頁，基本資料查詢沒有；
+            # 換源後暫缺，template 以 if 包住，不會留空列。
+            "free5": None,
+            "monthly_fee": None,
+            "after_school": clean(p.get("after_school")),  # 課後留園
             "shuttle": clean(p.get("shuttle")),          # 幼童專用車
-            "monthly_fee": as_int(p.get("monthly")),
             "floor": clean(p.get("floor")),
-            "area_indoor": clean(p.get("size_in")),
-            "area_outdoor": clean(p.get("size_out")),
-            "reg_no": clean(p.get("reg_no")),            # 立案／設立許可文號
+            "area_total": clean(p.get("area_total")),
+            "area_indoor": clean(p.get("area_indoor")),
+            "area_outdoor": clean(p.get("area_outdoor")),
+            "reg_no": clean(p.get("reg_no")),            # 最初設立許可文號（主鍵原料）
             "reg_date": clean(p.get("reg_date")),
-            "is_active": bool(p.get("is_active")),
+            "reg_id": clean(p.get("reg_id")),            # 重發證書字號，一年變動一成
+            "evaluations": p.get("evaluations") or [],   # 多年度評鑑歷史
+            "is_active": True,
             # 個資，僅供內部歸戶；不得進公開層（見模組 docstring）
             "owner": clean(p.get("owner")),
         })
@@ -286,6 +356,16 @@ def fetch_sources(raw_dir: Path, no_fetch: bool) -> dict[str, dict] | None:
     return got
 
 
+def load_schools(data_dir: Path) -> tuple[list[dict], str | None]:
+    """幼兒園主檔（`crawler/ece_schools.py`）。缺檔即中止：不像托嬰中心有
+    kiang 那份可退，這是幼兒園唯一的主檔來源。"""
+    path = data_dir / "data" / "ece" / "schools.json"
+    if not path.exists():
+        return [], None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload.get("records", []), payload.get("as_of")
+
+
 def previous_counts(path: Path) -> dict[str, int]:
     if not path.exists():
         return {}
@@ -319,12 +399,22 @@ def main(argv: list[str]) -> int:
     if got is None:
         return 1
 
+    schools, schools_as_of = load_schools(data_dir)
+    if not schools:
+        log("缺少幼兒園主檔 data/ece/schools.json，先跑 crawler/ece_schools.py")
+        return 1
+
     global NCWIS, NCWIS_AS_OF
     NCWIS, NCWIS_AS_OF = load_ncwis(data_dir)
     if NCWIS:
         log(f"托嬰中心主檔 {len(NCWIS):,} 家（crawler/ncwis_centers.py）")
 
     records, issues, counts = [], [], {}
+    built = build_preschool(schools, issues)
+    counts["preschool"] = len(built)
+    records.extend(built)
+    log(f"preschool：主檔 {len(schools):,} 筆 → 入庫 {len(built):,} 筆"
+        f"（as_of {schools_as_of}）")
     for kind, _source, _url, _filename in SOURCES:
         features = json.loads(got[kind]["path"].read_text(encoding="utf-8"))["features"]
         built = BUILDERS[kind](features, issues)
@@ -370,9 +460,12 @@ def main(argv: list[str]) -> int:
 
     out = {
         "as_of": as_of,
-        "sources": [{"kind": k, "url": got[k]["url"], "sha256": got[k]["sha256"],
-                     "bytes": got[k]["bytes"], "license": "MIT (kiang)"}
-                    for k, *_ in SOURCES],
+        "sources": [{"kind": "preschool", "url": "https://ap.ece.moe.edu.tw/webecems/",
+                     "via": "crawler/ece_schools.py", "as_of": schools_as_of,
+                     "license": "政府資料開放授權條款—第 1 版"}]
+        + [{"kind": k, "url": got[k]["url"], "sha256": got[k]["sha256"],
+            "bytes": got[k]["bytes"], "license": "MIT (kiang)"}
+           for k, *_ in SOURCES],
         "records": sorted(records, key=lambda r: r["id"]),
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
