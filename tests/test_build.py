@@ -138,7 +138,9 @@ def main():
         assert '<meta property="og:url" content="https://example.workers.dev/i/preschool-a">' in page
         assert '<meta name="twitter:card" content="summary">' in page
         assert '<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">' in page
-        assert (out / "assets/favicon.svg").exists()
+        from xml.etree import ElementTree
+        # SVG 壞掉時瀏覽器只是靜靜不畫、檔案照樣 200，肉眼與 HTTP 都看不出來
+        ElementTree.fromstring((out / "assets/favicon.svg").read_text())
 
         # 6a 全站 noindex，且 robots 仍允許檢索（擋掉就讀不到 noindex）
         assert '<meta name="robots" content="noindex, nofollow">' in page

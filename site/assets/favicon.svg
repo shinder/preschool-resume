@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="幼兒園履歷">
-  <!-- 卷宗＋硃印：呼應站上「裁罰卷宗」的語彙。純幾何、不依賴字型，
-       16px 下仍分得出形狀。配色取自 style.css 的 --indigo 與 --seal。 -->
+  <!-- 卷宗＋硃印：呼應站上「裁罰卷宗」的語彙。純幾何、不依賴字型，16px 下仍
+       分得出形狀。配色取自 style.css 的靛藍與硃砂兩個 token。
+       注意：XML 註解不得出現連續兩個減號，所以這裡不寫出那兩個變數名——
+       第一版就是這樣寫壞的，檔案能下載但瀏覽器解析失敗、圖示畫不出來。 -->
   <rect width="32" height="32" rx="6" fill="#234e70"/>
   <path d="M9 7h9l5 5v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z" fill="#f5f7f8"/>
   <path d="M18 7l5 5h-5z" fill="#c3d3e0"/>

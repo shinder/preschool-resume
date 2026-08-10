@@ -20,6 +20,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 from urllib.parse import quote
+from xml.etree import ElementTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "crawler"))
 
@@ -337,7 +338,17 @@ def main(argv: list[str]) -> int:
     assets = repo / "site" / "assets"
     for f in sorted(assets.iterdir()):
         if f.is_file():
-            write(out / "assets" / f.name, f.read_text(encoding="utf-8"))
+            text = f.read_text(encoding="utf-8")
+            # SVG 是 XML，格式不合法時瀏覽器會靜靜地不畫，檔案本身仍然 200，
+            # 從產物或 HTTP 狀態完全看不出來。favicon 第一版就是這樣壞的
+            # （註解裡寫了 --indigo，XML 註解不得有連續兩個減號）。
+            if f.suffix == ".svg":
+                try:
+                    ElementTree.fromstring(text)
+                except ElementTree.ParseError as e:
+                    log(f"中止：{f.name} 不是合法的 XML——{e}")
+                    return 1
+            write(out / "assets" / f.name, text)
             files += 1
 
     log(f"產出 {files:,} 檔於 {out}：機構 {len(institutions):,}、"
