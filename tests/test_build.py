@@ -112,6 +112,11 @@ def main():
         # 連結若寫 .html 等於每次瀏覽都多一跳。
         assert 'href="/i/preschool-b"' in page, "內部連結應不帶 .html"
         assert "i/preschool-b.html" not in page
+        # 模板裡手寫的連結也不能帶 .html——href() 只管程式產生的網址，
+        # 頁首導覽的 /about.html 就是這樣漏了一輪，每頁都白吃一次 307
+        import re as _re2
+        stale = _re2.findall(r'href="(/[^"]*\.html)"', page)
+        assert not stale, f"仍有帶 .html 的連結：{stale}"
         # canonical 指向同一個無副檔名網址
         assert ('<link rel="canonical" href="https://example.workers.dev/i/preschool-a">'
                 in page), "缺少 canonical"
@@ -141,6 +146,11 @@ def main():
         from xml.etree import ElementTree
         # SVG 壞掉時瀏覽器只是靜靜不畫、檔案照樣 200，肉眼與 HTTP 都看不出來
         ElementTree.fromstring((out / "assets/favicon.svg").read_text())
+
+        # 聯絡方式：每頁頁尾都有，關於頁另有更正原則
+        assert 'mailto:service@ggggg.app' in page
+        about = (out / "about.html").read_text()
+        assert "更正原則" in about and "不因當事人要求而刪除" in about
 
         # 6a 全站 noindex，且 robots 仍允許檢索（擋掉就讀不到 noindex）
         assert '<meta name="robots" content="noindex, nofollow">' in page
