@@ -1,9 +1,11 @@
 #!/bin/bash
 # 解析＋diff 事件產出：排程進入點
 #
-# 兩軌備份（Actions 05:30 社家署、old-mini 06:30 教保網）都完成後執行，
-# 單點跑在 old-mini（每日 08:30，見 scripts/systemd/preschool-diff.*），
-# 避免兩處同時改 penalties.json 的競態。
+# 兩軌備份（Actions 05:30 社家署、old-mini 06:30 教保網）都完成後執行。
+#
+# **這一軌已於 2026-08-10 搬到 GitHub Actions（.github/workflows/diff.yml）。**
+# 本檔保留供離線手動重跑，systemd 單元已刪除——排程若在兩處同時跑，會產生
+# 改 penalties.json 的競態。手動跑之前請先確認當天 Actions 那邊沒有在跑。
 #
 # diff.py 的安全機制：解析有任何失敗、或單次 removed 異常量，都會
 # exit 1 且不寫檔——此時本腳本不 commit，異常留在 log 裡等人工處理。

@@ -9,12 +9,13 @@
 #     site       ：GitHub Actions 台北 09:00（site.yml）
 #   低頻：
 #     ncwis      ：old-mini systemd 每週六 04:30（scripts/local_ncwis.sh）
+#     ece_schools：old-mini systemd 每月 1 號 01:00（scripts/local_ece_schools.sh）
 #
 # 本 workflow 每日台北 09:30 檢查。每日軌要求「心跳是今天的」；低頻軌要求
-# 「心跳在容許天數內」——否則週更的工作每天都會誤報。
+# 「心跳在容許天數內」——否則週更、月更的工作每天都會誤報。
 #
 # 低頻軌本來完全不在監控內，於是「默默死掉沒人知道」：一個週更的工作停擺，
-# 可能好幾個月後才從資料上看出來。容許天數留一次補跑的餘裕（週更給 8 天）。
+# 可能好幾個月後才從資料上看出來。容許天數留一次補跑的餘裕（週更 8 天、月更 35 天）。
 #
 # 任一不符即讓 workflow 失敗 → GitHub 原生失敗通知信，不依賴外部通知服務。
 # 涵蓋：爬蟲失敗、解析失敗（diff 引擎 exit 1）、removed 異常量警戒、
@@ -48,7 +49,7 @@ jobs:
           FAIL=0
 
           # job:容許落後天數（0＝必須是今天）
-          for spec in sfaa_backup:0 ece_backup:0 diff:0 site:0 ncwis:8; do
+          for spec in sfaa_backup:0 ece_backup:0 diff:0 site:0 ncwis:8 ece_schools:35; do
             job="${spec%%:*}"; grace="${spec##*:}"
             f="data/status/$job.json"
             if [ ! -f "$f" ]; then

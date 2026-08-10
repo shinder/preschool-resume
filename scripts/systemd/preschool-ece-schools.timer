@@ -1,0 +1,11 @@
+# 每月 1 號 01:00。全量（1／4／7／10 月）約 4 小時 15 分、增量約 30 分，
+# 兩者都在 06:30 的教保網備份之前收工——同 IP 併發 session 會讓備份拿到 500。
+[Unit]
+Description=每月 1 號 01:00 執行幼兒園主檔更新
+
+[Timer]
+OnCalendar=*-*-01 01:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
