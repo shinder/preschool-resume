@@ -71,11 +71,13 @@
   window.addEventListener("hashchange", function () {
     var v = readHash();
     if (!v) return;
-    map.setView([v.lat, v.lng], v.z);
+    // 先套模式再移動視角：setView 觸發的 moveend 會回寫網址，若那時模式還沒更新，
+    // 就會把舊模式寫回去，變成「網址寫 vacancy、畫面其實是 penalty」。
     if (modeSelect && modeSelect.value !== v.mode) {
       modeSelect.value = v.mode;
       render();
     }
+    map.setView([v.lat, v.lng], v.z);
   });
 
   var RADIUS = 8;
