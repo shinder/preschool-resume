@@ -109,9 +109,12 @@ a:hover { color: var(--seal); }
 #map { height: min(62vh, 34rem); border: 1px solid var(--rule); background: var(--field); }
 .leaflet-container { font-family: var(--sans); }
 
-/* NLSC 在低倍率是地形渲染（綠山藍海），直接當底圖太搶。
-   降飽和＋提亮，把它壓成淡灰底，硃砂標記才跳得出來，中文地名也還讀得到。 */
-.leaflet-tile-pane { filter: saturate(0.28) brightness(1.1) contrast(0.92); }
+/* 底圖不加濾鏡（2026-08-10 決定）。原本掛的是
+   `saturate(0.28) brightness(1.1) contrast(0.92)`，把 NLSC 的地形渲染
+   （綠山藍海）壓成淡灰底。並排比較五種強度之後改回原色：地形本身有資訊，
+   山區與平原一眼可辨，濾鏡把它抹掉了。
+   代價是低倍率的綠地會與「無裁罰」的亮綠標記較接近——那個標記另有空心環
+   的形狀區別（見 map.js 的配色說明），不單靠顏色。 */
 
 /* 聚合標記是中性的計數，不代表裁罰——用橘色，避免紅／綠暗示整區的狀態 */
 .marker-cluster {
