@@ -65,6 +65,19 @@
   map.whenReady(function () { setTimeout(function () { settling = false; }, 0); });
   map.on("moveend", function () { if (!settling) writeHash(); });
 
+  // 同一頁只改雜湊時瀏覽器不會重新載入，本檔也就不會再跑一次——不接這個事件的話
+  // 會出現「網址寫一個視角、地圖停在另一個視角」。replaceState 不觸發 hashchange，
+  // 所以不會跟上面的寫入互相打架。
+  window.addEventListener("hashchange", function () {
+    var v = readHash();
+    if (!v) return;
+    map.setView([v.lat, v.lng], v.z);
+    if (modeSelect && modeSelect.value !== v.mode) {
+      modeSelect.value = v.mode;
+      render();
+    }
+  });
+
   var RADIUS = 8;
   var STYLES = {
     penalty: { color: "#b23a2f", fill: "#b23a2f", opacity: 0.8, weight: 1 },
