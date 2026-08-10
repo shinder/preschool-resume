@@ -133,14 +133,20 @@ def _digest(*parts: str) -> str:
     return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
+def preschool_base_key(rec: dict) -> str:
+    """主鍵的基本雜湊（撞號延伸之前）。用它判斷「是不是同一家園」——延伸雜湊
+    會因為同批資料裡有沒有撞號對象而不同，跨來源比對必須用基本雜湊。"""
+    return _digest(norm_key(rec.get("city")), norm_key(rec.get("reg_no")),
+                   norm_key(rec.get("name")))
+
+
 def assign_preschool_ids(rows: list[dict], issues: list) -> dict[int, str]:
     """幼兒園主鍵：digest(縣市 + reg_no + 園名)，見模組 docstring。
 
     實測全量 0 撞號，但仍留確定性的保底：真撞上就依序追加未正規化園名、
     鄉鎮、序號。只在撞號組內生效，不像兩層設計那樣常態影響五分之一的紀錄。
     """
-    base = {i: _digest(norm_key(r.get("city")), norm_key(r.get("reg_no")),
-                       norm_key(r.get("name"))) for i, r in enumerate(rows)}
+    base = {i: preschool_base_key(r) for i, r in enumerate(rows)}
     groups = defaultdict(list)
     for i, d in base.items():
         groups[d].append(i)
@@ -366,13 +372,58 @@ def load_schools(data_dir: Path) -> tuple[list[dict], str | None]:
     return payload.get("records", []), payload.get("as_of")
 
 
+def history_path(data_dir: Path) -> Path:
+    return data_dir / "data" / "ece" / "schools_history.json"
+
+
+def load_payload(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def carry_forward(live: list[dict], data_dir: Path, as_of: str) -> list[dict]:
+    """墓碑名冊：曾經在站方名冊上、現已不在的幼兒園。
+
+    需要它是因為裁罰活得比園所久——站方的基本資料查詢只列現存園，但已停辦或
+    已改名的園仍有裁罰要展示。實測只用現存名冊，ece 對照率會從 97.6% 掉到
+    87.0%（898 筆裁罰接不上機構），低於 match.py 的 95% 門檻。
+
+    存成獨立檔案而非從 institutions.json 結轉：後者是衍生產物，本專案已經
+    弄丟過一次，墓碑名冊丟了就再也回不來。種子見 crawler/seed_ece_history.py。
+    """
+    live_ids = {r["id"] for r in live}
+    carried = {r["id"]: r for r in load_payload(history_path(data_dir)).get("records", [])}
+    # 上一版現存、這次爬不到的，本次轉為墓碑。last_seen 取上一版的 as_of——
+    # 那才是它最後一次真的還在名冊上的日期（種子紀錄我方沒見過，留 None）。
+    prev = load_payload(data_dir / "data" / "institutions.json")
+    last_seen = prev.get("as_of") or as_of
+    for r in prev.get("records", []):
+        if r.get("kind") == "preschool" and r["id"] not in live_ids:
+            carried.setdefault(r["id"], dict(r, is_active=False, last_seen=last_seen))
+    # 重新出現在名冊上的園（復業、或站方漏列後補回）不再是墓碑
+    tombstones = [r for i, r in carried.items() if i not in live_ids]
+    return sorted(tombstones, key=lambda r: r["id"])
+
+
+def active_counts(records: list[dict]) -> dict[str, int]:
+    """縮水門檻只數現存機構。
+
+    墓碑結轉會讓總筆數不減反增，若拿總數比對，爬蟲半殘時 N 千家會被靜靜
+    轉成「已停辦」而門檻毫無反應——那比筆數掉下來更糟，等於公開了錯誤的
+    營運狀態。故兩邊都只數 is_active。
+    """
+    counts: dict[str, int] = {}
+    for r in records:
+        if r.get("is_active", True):
+            counts[r.get("kind")] = counts.get(r.get("kind"), 0) + 1
+    return counts
+
+
 def previous_counts(path: Path) -> dict[str, int]:
     if not path.exists():
         return {}
-    counts: dict[str, int] = {}
-    for r in json.loads(path.read_text(encoding="utf-8")).get("records", []):
-        counts[r.get("kind")] = counts.get(r.get("kind"), 0) + 1
-    return counts
+    return active_counts(json.loads(path.read_text(encoding="utf-8")).get("records", []))
 
 
 def main(argv: list[str]) -> int:
@@ -411,16 +462,17 @@ def main(argv: list[str]) -> int:
 
     records, issues, counts = [], [], {}
     built = build_preschool(schools, issues)
-    counts["preschool"] = len(built)
+    tombstones = carry_forward(built, data_dir, as_of)
     records.extend(built)
+    records.extend(tombstones)
     log(f"preschool：主檔 {len(schools):,} 筆 → 入庫 {len(built):,} 筆"
-        f"（as_of {schools_as_of}）")
+        f"（as_of {schools_as_of}）＋墓碑名冊 {len(tombstones):,} 筆")
     for kind, _source, _url, _filename in SOURCES:
         features = json.loads(got[kind]["path"].read_text(encoding="utf-8"))["features"]
         built = BUILDERS[kind](features, issues)
-        counts[kind] = len(built)
         records.extend(built)
         log(f"{kind}：上游 {len(features):,} 筆 → 入庫 {len(built):,} 筆")
+    counts = active_counts(records)
 
     # 品質門檻一：id 重複代表上游主鍵語意改變，後續對照會錯接，直接中止
     dups = [i for i, n in Counter(r["id"] for r in records).items() if n > 1]
@@ -472,6 +524,13 @@ def main(argv: list[str]) -> int:
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n",
                         encoding="utf-8")
     log(f"寫入 {out_path}")
+
+    # 墓碑名冊回寫：這次新消失的園加進去，復業的移出去
+    hp = history_path(data_dir)
+    hp.parent.mkdir(parents=True, exist_ok=True)
+    hp.write_text(json.dumps({"as_of": as_of, "records": tombstones},
+                             ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    log(f"寫入 {hp}（墓碑 {len(tombstones):,} 筆）")
 
     issues_path = out_path.parent / "institutions_issues.json"
     if issues:

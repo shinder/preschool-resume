@@ -34,10 +34,8 @@ def preschool(n: int, *, coords=(121.5, 25.0), address="臺北市中正區測試
 
 
 def pid(rec: dict) -> str:
-    """測試用：重算某筆 schools.json 紀錄應得的機構 id。"""
-    return "preschool:" + institutions._digest(
-        institutions.norm_key(rec["city"]), institutions.norm_key(rec["reg_no"]),
-        institutions.norm_key(rec["name"]))
+    """測試用：某筆 schools.json 紀錄應得的機構 id（未撞號時即基本雜湊）。"""
+    return "preschool:" + institutions.preschool_base_key(rec)
 
 
 def babycare(n: int, *, address="231新北市新店區中央里中央一街20號1樓") -> dict:
@@ -214,6 +212,37 @@ def main():
         assert run(d, "2026-08-10") == 1
         kept = json.loads((d / "data/institutions.json").read_text())
         assert kept["as_of"] == "2026-08-09" and len(kept["records"]) == 101
+
+    # 五之二、墓碑名冊：消失的園結轉、復業的移出、裁罰對照才接得住歷史
+    with tempfile.TemporaryDirectory() as tmp:
+        d = Path(tmp)
+        all20 = [preschool(i) for i in range(20)]
+        gone = all20[7]
+        rest = [p for p in all20 if p is not gone]
+        write_sources(d, all20, [babycare(1)])
+        assert run(d, "2026-08-10") == 0
+        assert load(d)[pid(gone)]["is_active"] is True
+        hist = d / "data/ece/schools_history.json"
+        assert json.loads(hist.read_text())["records"] == []
+
+        # 從站方名冊消失 → 轉為墓碑，仍留在主檔供裁罰對照（20 家掉 1 家未觸發縮水門檻）
+        write_sources(d, rest, [babycare(1)])
+        assert run(d, "2026-08-11") == 0
+        recs = load(d)
+        assert recs[pid(gone)]["is_active"] is False
+        assert recs[pid(gone)]["last_seen"] == "2026-08-10"   # 上一版的 as_of
+        assert recs[pid(rest[0])]["is_active"] is True
+        assert [r["id"] for r in json.loads(hist.read_text())["records"]] == [pid(gone)]
+
+        # 墓碑不得讓縮水門檻失效：爬蟲半殘時筆數靠墓碑補回來，門檻仍須擋下
+        write_sources(d, all20[:5], [babycare(1)])
+        assert run(d, "2026-08-11") == 1
+
+        # 復業 → 移出墓碑名冊，欄位以最新爬到的為準
+        write_sources(d, all20, [babycare(1)])
+        assert run(d, "2026-08-12") == 0
+        assert load(d)[pid(gone)]["is_active"] is True
+        assert json.loads(hist.read_text())["records"] == []
 
     # 六、--no-fetch 但無快照：明確失敗，不產生空主檔
     with tempfile.TemporaryDirectory() as tmp:
