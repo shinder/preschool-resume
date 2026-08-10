@@ -165,6 +165,17 @@ def parse_ece(data_dir: Path, failures: list[str]) -> list[dict]:
                 failures.append(f"ece:{city}_{name} 詳情快照不存在")
                 continue
             records.extend(parse_ece_detail(path, row, city, name, failures))
+
+    # 文號品質告警：站方偶有把別欄內容打進文號欄的紀錄（實測「高市教幼字第
+    # 負責人黃俊賢號」——高雄市把負責人姓名填進去了）。原始 HTML 就長這樣，
+    # 不是解析瑕疵，所以照實保留（doc_no 也參與撞號時的延伸雜湊，改動會換 id）；
+    # 外洩由 public_data 的姓名遮罩擋住。這裡只計數，讓新案例不會默默溜過去。
+    # 刻意不進 failures：這是上游資料品質，不該讓每日 diff 停擺。
+    odd = [r["doc_no"] for r in records
+           if r["doc_no"] and not any(c.isdigit() for c in r["doc_no"])]
+    if odd:
+        log(f"ece：文號格式異常 {len(odd)} 筆（無任何數字，上游填錯欄）：{sorted(set(odd))}")
+
     assign_ece_ids(records)
     return records
 
