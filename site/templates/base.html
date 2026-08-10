@@ -21,7 +21,13 @@
 {%- if canonical %}
 <meta property="og:url" content="{{ base_url }}{{ canonical }}">
 {%- endif %}
-<meta name="twitter:card" content="summary">
+{#- 全站共用一張 og:image。不逐頁生成：機構頁近萬頁，靜態資產上限 20,000 檔，
+    而且每頁一張圖也沒有相稱的資訊量。 #}
+<meta property="og:image" content="{{ base_url }}/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="幼兒園履歷：官方公告到期就下架，這裡不會。">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/style.css">
 {%- block head %}{% endblock %}

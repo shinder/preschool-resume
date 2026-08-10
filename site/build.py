@@ -336,8 +336,15 @@ def main(argv: list[str]) -> int:
         files += 1
 
     assets = repo / "site" / "assets"
+    # 二進位資產（og:image 等）不能走 read_text，會 UnicodeDecodeError 讓建置整個掛掉
+    BINARY = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".woff", ".woff2"}
     for f in sorted(assets.iterdir()):
-        if f.is_file():
+        if f.is_file() and f.suffix.lower() in BINARY:
+            dest = out / "assets" / f.name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(f.read_bytes())
+            files += 1
+        elif f.is_file():
             text = f.read_text(encoding="utf-8")
             # SVG 是 XML，格式不合法時瀏覽器會靜靜地不畫，檔案本身仍然 200，
             # 從產物或 HTTP 狀態完全看不出來。favicon 第一版就是這樣壞的

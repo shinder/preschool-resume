@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+    <title>幼兒園履歷 og:image 來源檔</title>
+  <desc>
+    產物是 site/assets/og.png（1200x630）。重新產生（macOS，不需額外工具）：
+
+      qlmanage -t -s 1200 -o /tmp site/og-image-source.svg
+      sips -c 630 1200 /tmp/og-image-source.svg.png --out site/assets/og.png
+
+    畫布刻意做成 1200x1200 並把設計置中：qlmanage 會依高度縮放並輸出正方形畫布，
+    直接給 1200x630 會被裁掉右半邊，所以先方後裁。
+
+    本檔放在 site/ 而非 site/assets/，因為後者整個目錄都會被複製進產物。
+    說明寫在 desc 而不是 XML 註解，因為註解不得含連續兩個減號，而上面的指令有。
+  </desc>
+  <style>
+    .s { font-family: "PingFang TC", "Noto Sans TC", "Heiti TC", sans-serif; }
+    .mono { font-family: "SF Mono", Menlo, monospace; }
+  </style>
+  <rect width="1200" height="1200" fill="#f5f7f8"/>
+  <g transform="translate(0,285)">
+    <rect x="0" y="0" width="14" height="630" fill="#234e70"/>
+
+    <g transform="translate(84,74) scale(1.75)">
+      <rect width="32" height="32" rx="6" fill="#234e70"/>
+      <path d="M9 7h9l5 5v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z" fill="#f5f7f8"/>
+      <path d="M18 7l5 5h-5z" fill="#c3d3e0"/>
+      <rect x="11" y="15" width="8" height="1.6" rx="0.8" fill="#234e70"/>
+      <rect x="11" y="18.4" width="6" height="1.6" rx="0.8" fill="#234e70"/>
+      <circle cx="21" cy="21" r="4.2" fill="#b23a2f"/>
+    </g>
+    <text class="s" x="164" y="112" font-size="34" font-weight="700" fill="#1b2430"
+          letter-spacing="4">幼兒園履歷</text>
+
+    <text class="s" x="84" y="292" font-size="62" font-weight="700" fill="#1b2430"
+          letter-spacing="1">官方公告到期就下架。</text>
+    <text class="s" x="84" y="376" font-size="62" font-weight="400" fill="#5a6875"
+          letter-spacing="1">這裡不會。</text>
+
+    <line x1="84" y1="452" x2="1116" y2="452" stroke="#d4dce2" stroke-width="1"/>
+
+    <text class="s" x="84" y="502" font-size="26" fill="#5a6875">全台幼兒園與托嬰中心的公開裁罰紀錄，含官方已下架、本站仍保留的部分。</text>
+    <text class="mono" x="84" y="556" font-size="24" fill="#234e70">preschool.ggggg.app</text>
+  </g>
+</svg>

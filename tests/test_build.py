@@ -141,8 +141,12 @@ def main():
         # 分享預覽與 favicon
         assert '<meta property="og:title" content="' in page
         assert '<meta property="og:url" content="https://example.workers.dev/i/preschool-a">' in page
-        assert '<meta name="twitter:card" content="summary">' in page
         assert '<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">' in page
+        assert '<meta property="og:image" content="https://example.workers.dev/assets/og.png">' in page
+        assert '<meta name="twitter:card" content="summary_large_image">' in page
+        # 二進位資產必須原樣複製——走 read_text 會 UnicodeDecodeError 讓建置整個掛掉
+        src = Path(build.__file__).parent / "assets" / "og.png"
+        assert (out / "assets/og.png").read_bytes() == src.read_bytes()
         from xml.etree import ElementTree
         # SVG 壞掉時瀏覽器只是靜靜不畫、檔案照樣 200，肉眼與 HTTP 都看不出來
         ElementTree.fromstring((out / "assets/favicon.svg").read_text())
