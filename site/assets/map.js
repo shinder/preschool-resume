@@ -14,9 +14,25 @@
   var el = document.getElementById("map");
   if (!el) return;
 
-  var map = L.map(el, { scrollWheelZoom: false });
   // 以台灣本島與離島範圍框定，避免固定 zoom 在寬螢幕留下大片海面
-  map.fitBounds([[21.9, 119.3], [25.35, 122.05]]);
+  var TW_BOUNDS = [[21.9, 119.3], [25.35, 122.05]];
+
+  /* 網址雜湊 #縮放/緯度/經度[/模式]：讓地圖視角跟著網址走。
+     沒有它的話，從地圖點進機構頁再返回，地圖會重置回全台——使用者剛才
+     找到的那一區就白找了。順帶讓「某一區的地圖」可以直接複製網址分享。
+     瀏覽器的 bfcache 有時會救到，但不可依賴，這裡做成確定的行為。 */
+  function readHash() {
+    var p = location.hash.replace(/^#/, "").split("/");
+    var z = parseInt(p[0], 10), lat = parseFloat(p[1]), lng = parseFloat(p[2]);
+    if (!isFinite(z) || !isFinite(lat) || !isFinite(lng)) return null;
+    if (z < 1 || z > 18 || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { z: z, lat: lat, lng: lng, mode: p[3] === "vacancy" ? "vacancy" : "penalty" };
+  }
+
+  var view = readHash();
+  var map = L.map(el, { scrollWheelZoom: false });
+  if (view) map.setView([view.lat, view.lng], view.z);
+  else map.fitBounds(TW_BOUNDS);
   L.tileLayer("https://wmts.nlsc.gov.tw/wmts/EMAP16/default/GoogleMapsCompatible/{z}/{y}/{x}", {
     maxZoom: 18,
     attribution:
@@ -32,6 +48,22 @@
     penalty: document.getElementById("legend-penalty"),
     vacancy: document.getElementById("legend-vacancy"),
   };
+  if (view && modeSelect) modeSelect.value = view.mode;
+
+  function writeHash() {
+    var c = map.getCenter();
+    // replaceState 而非 pushState：每拖曳一次就疊一筆歷史的話，
+    // 返回鍵會變成要按幾十次才離得開這一頁。
+    history.replaceState(null, "", location.pathname + location.search +
+      "#" + map.getZoom() + "/" + c.lat.toFixed(4) + "/" + c.lng.toFixed(4) +
+      (modeSelect && modeSelect.value === "vacancy" ? "/vacancy" : ""));
+  }
+
+  // 初次載入那一次的 moveend 不寫入，讓沒動過地圖的訪客保有乾淨的網址；
+  // 萬一漏擋也只是寫入當下這個（正確的）視角，無害。
+  var settling = true;
+  map.whenReady(function () { setTimeout(function () { settling = false; }, 0); });
+  map.on("moveend", function () { if (!settling) writeHash(); });
 
   var RADIUS = 8;
   var STYLES = {
@@ -120,6 +152,8 @@
     }
   }
 
-  if (modeSelect) modeSelect.addEventListener("change", render);
+  if (modeSelect) {
+    modeSelect.addEventListener("change", function () { writeHash(); render(); });
+  }
   render();
 })();
