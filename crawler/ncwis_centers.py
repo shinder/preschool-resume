@@ -19,7 +19,11 @@
   標記才是權威值。所以不需要 TGOS 也不需要 NLSC，本爬蟲自帶座標。
 
 低頻批次（機構主檔月更即可），不進每日排程，因此不寫心跳檔、不納入 watchdog。
-教保網封鎖境外 IP 的問題此站未測，預設在 old-mini 執行最保險。
+**此站同樣封鎖境外 IP，只能在 old-mini（台灣 IP）執行**：2026-08-10 自 GitHub
+Actions 實測兩次（出口 IP 52.161.50.38、52.188.87.20），對 `/home/childcare-center`
+的請求四次重試全部 `timed out`——是逾時而非 403，看起來是網路層丟包。
+注意同屬社家署的 `crc.sfaa.gov.tw`（裁罰專區）從 Actions 一直跑得通，
+兩站的封鎖策略不同，不能互相推論。
 
 用法：python3 crawler/ncwis_centers.py [--data-dir PATH] [--delay N]
       [--city 臺北市] [--limit N] [--new-only] [--parse-only]
