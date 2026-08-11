@@ -203,7 +203,12 @@ a:hover { color: var(--seal); }
 /* 基本資料表 */
 .facts { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 .facts th, .facts td { text-align: start; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
-.facts th { width: 6.5rem; font-weight: 500; color: var(--ink-soft); }
+/* 標題欄定寬四個中文字＋nowrap：auto 表格排版下 width 只是建議值，值欄一有
+   長網址之類的不可斷字串，中文標題就會被壓到逐字斷行。nowrap 讓最小寬度等於
+   整個標題（五字標題如「幼童專用車」的頁面會自然撐到五個字）；值欄配
+   overflow-wrap 讓長網址可斷，否則換 nowrap 這邊把表格撐出容器。 */
+.facts th { width: calc(4em + 1.2rem); font-weight: 500; color: var(--ink-soft); white-space: nowrap; }
+.facts td { overflow-wrap: anywhere; }
 .facts td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .facts .asof { font-size: 0.75rem; color: var(--ink-soft); }
 

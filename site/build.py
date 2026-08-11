@@ -17,7 +17,7 @@
 
 import json
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 from urllib.parse import quote
 from xml.etree import ElementTree
@@ -38,7 +38,10 @@ NEIGHBOUR_LIMIT = 12
 
 
 def inst_path(inst: dict) -> str:
-    return f"/i/{inst['kind']}-{inst['native_id']}.html"
+    # 2026-08-11 拿掉 kind 前綴：兩種 native_id 格式互斥（幼兒園 16 位十六進位
+    # 雜湊、托嬰 CW＋數字），共用 /i/ 不會撞；撞了由 main() 的路徑閘門擋下。
+    # 舊網址由 _redirects 轉址接住。
+    return f"/i/{inst['native_id']}.html"
 
 
 def city_path(city: str) -> str:
@@ -212,6 +215,14 @@ def main(argv: list[str]) -> int:
     files = 0
 
     # ---------- 機構頁 ----------
+    # 路徑閘門：網址不帶 kind 前綴後，所有機構共用 /i/ 命名空間。現有兩種
+    # native_id 格式互斥，這裡確保日後新增來源或改 id 規則時，撞出同一條路徑
+    # 會讓建置失敗，而不是後寫的靜靜蓋掉先寫的。
+    dupes = [p for p, n in Counter(inst_path(i) for i in institutions).items() if n > 1]
+    if dupes:
+        log(f"中止：機構路徑重複 {len(dupes)} 條，如 {dupes[:3]}")
+        return 1
+
     escape_failures = []
     for inst in institutions:
         path = inst_path(inst)
@@ -291,7 +302,7 @@ def main(argv: list[str]) -> int:
     # 點位檔為預設載入，體積要省：座標取 5 位小數（約 1 公尺，地圖用綽綽有餘），
     # 網址只存 id 片段，由前端補上 /i/ 與 .html
     def slug(inst):
-        return f"{inst['kind']}-{inst['native_id']}"
+        return inst["native_id"]
 
     def coord(v):
         return round(v, 5)
@@ -326,6 +337,11 @@ def main(argv: list[str]) -> int:
 
     # ---------- sitemap 與 robots ----------
     write(out / "sitemap.xml", env.get_template("sitemap.xml").render(urls=urls))
+    # 帶 kind 前綴的舊機構網址（2026-08-10 上線的第一版）轉到新網址。
+    # Workers 靜態資產的 _redirects：動態規則上限 100 條，這裡用 2 條。
+    write(out / "_redirects",
+          "/i/preschool-* /i/:splat 301\n/i/babycare-* /i/:splat 301\n")
+    files += 1
     # 6a 期間靠頁面上的 noindex，robots 仍允許檢索——擋掉檢索就讀不到 noindex
     write(out / "robots.txt",
           f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n")
