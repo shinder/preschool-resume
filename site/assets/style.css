@@ -3,16 +3,18 @@
    機器可讀的識別碼（文號／日期／金額／統計）一律等寬，人讀敘述走中文系統字。 */
 
 :root {
-  --paper: #f5f7f8;
-  --card: #ffffff;
-  --field: #edf1f3;
-  --rule: #d4dce2;
+  /* 整組往下壓半階（2026-08-11）：純白卡片＋近白紙底在大面積下太刺眼，
+     卡片改米白、紙底加深，層次靠明度差維持，不靠白撐。 */
+  --paper: #e9edef;
+  --card: #f8fafa;
+  --field: #e1e6e9;
+  --rule: #c9d2d8;
   --ink: #1b2430;
   --ink-soft: #5a6875;
   --indigo: #234e70;
-  --indigo-soft: #e5edf3;
+  --indigo-soft: #dde7ee;
   --seal: #b23a2f;
-  --seal-soft: #f7e9e7;
+  --seal-soft: #f0e2df;
 
   --sans: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Helvetica Neue",
     system-ui, sans-serif;
@@ -112,8 +114,10 @@ a:hover { color: var(--seal); }
    往白推、contrast 又低於 1 再把它壓平，細線先消失。對比超過 1 則相反——底色更白、
    線條相對變深，道路與行政區界回得來，而飽和度仍壓著地形色塊不搶戲。
    1.05 是並排比較 0.92／1.05／1.15／1.3／1.5 之後選的：再高會讓綠地與水體的
-   顏色一起回來，開始跟標記搶。 */
-.leaflet-tile-pane { filter: saturate(0.28) brightness(1.1) contrast(1.05); }
+   顏色一起回來，開始跟標記搶。
+   brightness 從 1.1 降到 1.04（2026-08-11）：整站配色壓暗半階後，地圖磚維持 1.1
+   會變成版面上最亮的一塊，降一點讓它跟米白卡片同一層。 */
+.leaflet-tile-pane { filter: saturate(0.28) brightness(1.04) contrast(1.05); }
 
 /* 聚合標記是中性的計數，不代表裁罰——用橘色，避免紅／綠暗示整區的狀態 */
 .marker-cluster {
@@ -181,9 +185,9 @@ a:hover { color: var(--seal); }
   font-size: 0.75rem; padding: 0.2rem 0.55rem; border: 1px solid var(--rule);
   background: var(--field); color: var(--ink-soft); border-radius: 2px;
 }
-.badge.alert { background: var(--seal-soft); border-color: #e3bfba; color: var(--seal); font-weight: 600; }
-.badge.closed { background: #eceff1; color: #6b7a86; }
-.badge.open { background: var(--indigo-soft); border-color: #cddceb; color: var(--indigo); font-weight: 600; }
+.badge.alert { background: var(--seal-soft); border-color: #dcb6b0; color: var(--seal); font-weight: 600; }
+.badge.closed { background: var(--field); color: #6b7a86; }
+.badge.open { background: var(--indigo-soft); border-color: #c3d4e2; color: var(--indigo); font-weight: 600; }
 .badge.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 /* 單欄時裁罰紀錄先出現——那是來訪者要找的東西，基本資料退到後面 */
@@ -258,7 +262,7 @@ a:hover { color: var(--seal); }
 
 .follow {
   margin-top: 2.5rem; padding: 1.1rem 1.25rem;
-  background: var(--indigo-soft); border: 1px solid #cddceb;
+  background: var(--indigo-soft); border: 1px solid #c3d4e2;
 }
 .follow h2 { margin: 0 0 0.35rem; font-size: 0.9375rem; }
 .follow p { margin: 0; font-size: 0.875rem; color: var(--ink-soft); }
