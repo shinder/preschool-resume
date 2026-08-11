@@ -188,6 +188,10 @@ def main():
         vac = json.loads((out / "data/points-vacancy.json").read_text())
         assert len(vac["rows"]) == 1 and vac["rows"][0][2] == 5
         assert "約 5 個" in (out / "i/CW1.html").read_text()
+        # 列表頁只有托嬰分頁有空位欄（幼兒園沒有實際收托數）
+        listing_page = (out / "city/新北市.html").read_text()
+        assert listing_page.count("<th>空位</th>") == 1
+        assert '<td class="num">5</td>' in listing_page
 
         # sitemap 收錄所有頁面且網址經過編碼
         sitemap = (out / "sitemap.xml").read_text()

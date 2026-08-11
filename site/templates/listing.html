@@ -5,12 +5,14 @@
 <script type="application/ld+json">{{ breadcrumb|safe }}</script>
 {%- endblock %}
 
-{% macro roster(kind_rows) -%}
+{% macro roster(kind_rows, vacancy=false) -%}
     <table class="roster">
-      <caption>依裁罰筆數排序，同筆數者依名稱排序。</caption>
+      <caption>依裁罰筆數排序，同筆數者依名稱排序。
+        {%- if vacancy %}空位為約略值（核定收托減實際收托），0 即額滿。{% endif %}</caption>
       <thead>
         <tr>
           <th>名稱</th>{% if not parent %}<th>鄉鎮市區</th>{% endif %}
+          {%- if vacancy %}<th>空位</th>{% endif %}
           <th>近 {{ recent_years }} 年</th><th>更早</th><th>最近一筆</th>
         </tr>
       </thead>
@@ -20,6 +22,7 @@
           <td><a href="{{ r.url }}">{{ r.name }}</a>
             {%- if not r.is_active %} <span class="badge closed">已停辦</span>{% endif %}</td>
           {%- if not parent %}<td>{{ r.town or "—" }}</td>{% endif %}
+          {%- if vacancy %}<td class="num">{{ r.vacancy if r.vacancy is not none else "—" }}</td>{% endif %}
           <td class="num{% if r.recent_penalty_count %} hit{% endif %}">{{ r.recent_penalty_count or "—" }}</td>
           <td class="num">{{ (r.penalty_count - r.recent_penalty_count) or "—" }}</td>
           <td class="num">{{ r.last_penalty_date or "—" }}</td>
@@ -75,7 +78,7 @@
         {%- else %}<p class="empty">{{ heading }}沒有收錄的幼兒園。</p>{% endif %}
       </div>
       <div class="tabpane" id="pane-babycare">
-        {%- if bab %}{{ roster(bab) }}
+        {%- if bab %}{{ roster(bab, vacancy=true) }}
         {%- else %}<p class="empty">{{ heading }}沒有收錄的托嬰中心。</p>{% endif %}
       </div>
     </div>

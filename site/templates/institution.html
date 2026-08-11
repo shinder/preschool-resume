@@ -67,7 +67,8 @@
           {%- if inst.enrolled is not none %}
           <tr><th>實際收托</th><td class="num">{{ inst.enrolled }} 人</td></tr>
           {%- endif %}
-          {%- if inst.vacancy is defined and inst.vacancy is not none %}
+          {#- 已停辦者不顯示空位：收托歸零後「核定減實際」是整批假空位 #}
+          {%- if inst.vacancy is defined and inst.vacancy is not none and inst.is_active %}
           <tr><th>空位</th><td class="num">
             {{- "約 " ~ inst.vacancy ~ " 個" if inst.vacancy > 0 else "已額滿" }}
             {%- if inst.enrolled_as_of %}<br><span class="asof">依 {{ inst.enrolled_as_of }} 名冊</span>{% endif %}
