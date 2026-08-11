@@ -249,11 +249,44 @@ a:hover { color: var(--seal); }
 .roster caption { text-align: start; color: var(--ink-soft); font-size: 0.8125rem; padding-bottom: 0.5rem; }
 .roster th, .roster td { text-align: start; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--rule); }
 .roster thead th { font-size: 0.75rem; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 500; }
+/* 長機構名會把其他欄擠到逐字斷行；表頭與短欄鎖住不斷行，斷行只留給名稱欄 */
+.roster thead th, .roster td:not(:first-child) { white-space: nowrap; }
 .roster td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: end; white-space: nowrap; }
 .roster td.num.hit { color: var(--seal); font-weight: 600; }
 .roster tbody tr:hover { background: var(--field); }
 
 .townlist { display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; font-size: 0.875rem; }
+
+/* ---------- 列表頁分頁籤（純 CSS：radio 決定顯示的 pane） ---------- */
+
+/* 視覺隱藏但可聚焦——radio 藏起來後，鍵盤仍能 Tab 進來、方向鍵切換分頁 */
+.vh {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+.tabbar { display: flex; gap: 1.75rem; border-bottom: 1px solid var(--rule); }
+.tabbar label {
+  cursor: pointer; font-size: 0.9375rem; color: var(--ink-soft);
+  padding: 0.35rem 0.15rem; margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+}
+.tabbar label:hover { color: var(--indigo); }
+.tabbar .num {
+  font-family: var(--mono); font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.tabpane { display: none; margin-top: 1rem; }
+#tab-preschool:checked ~ .tabbar label[for="tab-preschool"],
+#tab-babycare:checked ~ .tabbar label[for="tab-babycare"] {
+  color: var(--ink); font-weight: 600; border-bottom-color: var(--indigo);
+}
+#tab-preschool:checked ~ #pane-preschool,
+#tab-babycare:checked ~ #pane-babycare { display: block; }
+#tab-preschool:focus-visible ~ .tabbar label[for="tab-preschool"],
+#tab-babycare:focus-visible ~ .tabbar label[for="tab-babycare"] {
+  outline: 2px solid var(--indigo); outline-offset: 2px;
+}
 
 .refund { margin-top: 0.9rem; font-size: 0.875rem; color: var(--ink-soft); }
 .refund summary { cursor: pointer; color: var(--indigo); }
