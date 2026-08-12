@@ -1,7 +1,18 @@
 # 免費地圖建置與部署（工程執行計劃 6.6）
 #
-# 排在 diff（old-mini，台北 08:30）之後、watchdog（台北 09:30）之前，
-# 讓當天的新事件當天上站。
+# 由 diff 完成後觸發（workflow_run），不再自排 cron。
+#
+# 原本兩軌各自排 cron（diff 台北 08:30、本軌 09:00），靠 30 分鐘的時間差保證
+# 順序。但 Actions 的排程延遲是隨機的而且不小——2026-08-12 實測 diff 延遲
+# 2h34m、site 延遲 2h17m，30 分鐘的緩衝被吃到只剩 13 分。一旦反轉，site 會拿
+# 昨天的事件檔建站，而兩軌心跳都是今天的，watchdog 看不出來——靜默錯誤。
+# 改成依賴觸發之後，順序由事件保證，不再靠猜時間。
+#
+# 附帶效果：diff 失敗（解析錯誤、removed 異常量警戒）時本軌整個不跑，符合
+# 「寧可不更新，也不要用舊資料建出看起來很新的站」。
+#
+# 注意 workflow_run 事件下 checkout 拿到的是「觸發本次執行的那個 commit」，
+# 也就是 diff 開跑時的 main；diff 執行期間推的新 commit 要等下一輪才生效。
 #
 # 這條管線不碰政府網站，全部資料來自資料 repo 與 GitHub 上的 kiang 開放資料，
 # 所以不受教保網封鎖境外 IP 的限制，可以留在 Actions。
@@ -18,8 +29,9 @@
 name: site
 
 on:
-  schedule:
-    - cron: "0 1 * * *" # UTC 01:00 ＝ 台北 09:00，diff 跑完之後
+  workflow_run:
+    workflows: [diff] # 對應 diff.yml 的 name:，不是檔名
+    types: [completed]
   workflow_dispatch:
     inputs:
       index:
@@ -29,6 +41,11 @@ on:
 
 jobs:
   build:
+    # workflow_run 不分成敗都會送事件，成功才建站。
+    # 手動觸發沒有 workflow_run 這層 context，要單獨放行。
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

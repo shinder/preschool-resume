@@ -6,13 +6,19 @@
 #     sfaa_backup：GitHub Actions 台北 05:30（backup.yml）
 #     ece_backup ：old-mini systemd 06:30（scripts/local_backup.sh）
 #     diff       ：GitHub Actions 台北 08:30（diff.yml；2026-08-10 由 old-mini 搬來）
-#     site       ：GitHub Actions 台北 09:00（site.yml）
+#     site       ：接在 diff 之後由 workflow_run 觸發（site.yml）
 #   低頻：
 #     ncwis      ：old-mini systemd 每週六 04:30（scripts/local_ncwis.sh）
 #     ece_schools：old-mini systemd 每月 1 號 01:00（scripts/local_ece_schools.sh）
 #
-# 本 workflow 每日台北 09:30 檢查。每日軌要求「心跳是今天的」；低頻軌要求
+# 本 workflow 每日台北 12:00 檢查。每日軌要求「心跳是今天的」；低頻軌要求
 # 「心跳在容許天數內」——否則週更、月更的工作每天都會誤報。
+#
+# 原本排台北 09:30，只比 site 名義上的 09:00 晚半小時。但 Actions 的排程延遲
+# 是隨機的（2026-08-12 實測各軌都延遲兩小時上下），watchdog 可能搶在 site 之前
+# 跑完，看到昨天的心跳就誤報「site 心跳過期」。假警報收多了會連真警報一起被
+# 忽略，所以往後推到 12:00：本軌不能綁 workflow_run（還要等 old-mini 那三軌，
+# 跨機器串不起來），只能靠夠大的緩衝，而緩衝本身不花任何成本。
 #
 # 低頻軌本來完全不在監控內，於是「默默死掉沒人知道」：一個週更的工作停擺，
 # 可能好幾個月後才從資料上看出來。容許天數留一次補跑的餘裕（週更 8 天、月更 35 天）。
@@ -21,12 +27,16 @@
 # 涵蓋：爬蟲失敗、解析失敗（diff 引擎 exit 1）、removed 異常量警戒、
 # 建站閘門擋下（姓名外洩、逸出失敗、檔案數超限）、
 # old-mini 離線或 timer 沒跑（心跳過期）。
+#
+# diff 失敗時 site 不會被觸發（見 site.yml 的 workflow_run），於是同一天會收到
+# 兩則錯誤：diff exit≠0，加上 site 心跳過期。同一個根因，修 diff 即可；site 的
+# 那則不是誤報——站確實沒更新。
 
 name: watchdog
 
 on:
   schedule:
-    - cron: "30 1 * * *" # 台北 09:30
+    - cron: "0 4 * * *" # UTC 04:00 ＝ 台北 12:00
   workflow_dispatch:
 
 jobs:
