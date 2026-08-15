@@ -84,7 +84,7 @@ jobs:
           git config user.email "shinder.lin@gmail.com"
           git diff --cached --quiet || {
             git commit -m "機構主檔與對照 $(TZ=Asia/Taipei date +%F)"
-            git push
+            git pull --rebase --quiet && git push -q
           }
 
       - name: 6.3 公開層投影
@@ -126,5 +126,5 @@ jobs:
           git add status
           git diff --cached --quiet || {
             git commit -m "心跳 $(TZ=Asia/Taipei date +%F)（site）"
-            git push
+            git pull --rebase --quiet && git push -q
           }
