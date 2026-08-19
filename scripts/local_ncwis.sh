@@ -23,6 +23,11 @@ CODE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DATA_DIR="${DATA_DIR:-$(dirname "$CODE_DIR")/preschool-resume-data}"
 LOG="${LOG:-$HOME/preschool-ncwis.log}"
 
+# 同 local_backup.sh：log 超過 10MB 輪替成 .old，只在第一次啟動時做
+if [ "${PRESCHOOL_RELAUNCHED:-}" != "1" ] && [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 10485760 ]; then
+  mv "$LOG" "$LOG.old"
+fi
+
 exec >> "$LOG" 2>&1
 
 # 同 local_backup.sh：先 pull 再以新版腳本重啟自己，否則改動要延後一輪才生效
@@ -47,10 +52,10 @@ if git diff --cached --quiet; then
   echo "無任何變更（同日重跑）"
 elif git diff --cached --quiet -- . ':!status'; then
   git commit -q -m "心跳 $(TZ=Asia/Taipei date +%F)（ncwis exit=${RC}）"
-  git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
+  bash "$CODE_DIR/scripts/git_push_retry.sh"
 else
   git commit -q -m "托嬰主檔週更 $(TZ=Asia/Taipei date +%F)（exit=${RC}）"
-  git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
+  bash "$CODE_DIR/scripts/git_push_retry.sh"
 fi
 
 echo "===== 結束 ncwis exit=${RC} ====="

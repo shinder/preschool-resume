@@ -22,6 +22,13 @@ CODE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DATA_DIR="${DATA_DIR:-$(dirname "$CODE_DIR")/preschool-resume-data}"
 LOG="${LOG:-$HOME/preschool-backup.log}"
 
+# log 只進不出會無限成長（每日全量一輪的輸出不小），超過 10MB 就輪替成
+# .old，只留一代。只在第一次啟動時輪替——re-exec 那一輪跳過，免得把自己
+# 剛寫了開頭的檔案搬走。
+if [ "${PRESCHOOL_RELAUNCHED:-}" != "1" ] && [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 10485760 ]; then
+  mv "$LOG" "$LOG.old"
+fi
+
 exec >> "$LOG" 2>&1
 
 # 本腳本會 pull 自己所在的 repo，所以必須先 pull、再用新版重新啟動自己。
@@ -48,10 +55,10 @@ if git diff --cached --quiet; then
   echo "無任何變更（同日重跑）"
 elif git diff --cached --quiet -- . ':!status'; then
   git commit -q -m "心跳 $(TZ=Asia/Taipei date +%F)（ece）"
-  git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
+  bash "$CODE_DIR/scripts/git_push_retry.sh"
 else
   git commit -q -m "備份 $(date +%Y-%m-%d)（ece 全量）"
-  git pull --rebase --quiet && git push -q || echo "錯誤：push 失敗"
+  bash "$CODE_DIR/scripts/git_push_retry.sh"
 fi
 
 echo "===== 結束 ece exit=$ECE ====="
