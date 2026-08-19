@@ -36,13 +36,13 @@
       <span class="badge alert num">近 {{ recent_years }} 年 {{ penalties|length }} 筆裁罰</span>
       {%- endif %}
       {%- if inst.severe_recent_count %}
-      <span class="badge severe num">重大處分 {{ inst.severe_recent_count }} 筆</span>
+      <span class="badge severe num" title="本站標示：處分含「廢止」「終身」或單筆罰鍰達 30 萬元">重大處分 {{ inst.severe_recent_count }} 筆</span>
       {%- endif %}
       {%- if inst.dense %}
-      <span class="badge severe">短期密集裁罰</span>
+      <span class="badge severe" title="本站標示：近一年內曾在 30 天內受 3 筆以上裁罰">短期密集裁罰</span>
       {%- endif %}
       {%- if inst.fine_recent_total %}
-      <span class="badge num">近 {{ recent_years }} 年罰鍰累計 {{ "{:,}".format(inst.fine_recent_total) }} 元</span>
+      <span class="badge num" title="本站依公告文字解析加總">近 {{ recent_years }} 年罰鍰累計 {{ "{:,}".format(inst.fine_recent_total) }} 元</span>
       {%- endif %}
       {%- if older %}
       <span class="badge num">更早 {{ older|length }} 筆</span>
