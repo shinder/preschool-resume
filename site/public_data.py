@@ -22,7 +22,7 @@ import json
 import re
 import sys
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "crawler"))
@@ -50,6 +50,39 @@ PENALTY_FIELDS = (
 # 3 個月～6 年，永久等量呈現逾期紀錄不合比例；但「保留」與「顯著呈現」是兩件事——
 # 更早的紀錄仍完整公開、可查證，只是不再佔滿版面，也不進地圖預設圖層。
 RECENT_YEARS = 5
+
+# 警示分級（docs/07 方向一，2026-08-19）：純轉述官方處分文字，零推論。
+# 判定素材只掃 sanction（處分內容）——violation／fact 裡的「廢止」是敘述
+# 引用（實測 2 筆），掃進來會誤判。
+# 金額門檻取全站 P99：罰鍰 >= 30 萬全站僅 85 筆（中位數 9 千、P90 六萬）。
+# 「終身」目前 0 筆（官方查詢系統的處分內容只列罰鍰與廢照），保留關鍵字
+# 是因為新聞已有「終身不得擔任教保人員」的處分，日後上了系統即自動生效。
+SEVERE_FINE = 300_000
+SEVERE_RE = re.compile(r"廢止|終身")
+REVOKED_RE = re.compile(r"廢止.{0,6}設立許可")
+FINE_RE = re.compile(r"(\d[\d,]*)\s*元")
+# 密集裁罰（方向一之 3）：近一年內存在 30 天窗口 >= 3 筆，代表被密集稽查中。
+# 限定近一年——三年前的密集稽查不是「現在進行式」，掛徽章會誤導。
+DENSE_WINDOW_DAYS = 30
+DENSE_MIN = 3
+DENSE_LOOKBACK_DAYS = 365
+
+
+def fine_amount(sanction: str | None) -> int:
+    """處分內容裡最大的一筆金額。同筆常有數項（罰鍰＋怠金），取最大值分級。"""
+    return max((int(m.replace(",", "")) for m in FINE_RE.findall(sanction or "")),
+               default=0)
+
+
+def is_severe(sanction: str | None) -> bool:
+    return bool(SEVERE_RE.search(sanction or "")) or fine_amount(sanction) >= SEVERE_FINE
+
+
+def is_dense(dates: list[str], since: str) -> bool:
+    ds = sorted(date.fromisoformat(d) for d in dates if d >= since)
+    return any((ds[i + DENSE_MIN - 1] - ds[i]).days <= DENSE_WINDOW_DAYS
+               for i in range(len(ds) - DENSE_MIN + 1))
+
 
 ALIAS_FIELDS = (
     "institution_id", "current_name", "former_name", "type", "penalty_count",
@@ -128,7 +161,8 @@ def build_name_scanner(penalties: list[dict], institutions: list[dict]) -> set[s
     return {n for n in names if n not in inst_blob}
 
 
-def project_institutions(institutions: list[dict], summary: dict) -> list[dict]:
+def project_institutions(institutions: list[dict], summary: dict,
+                         dense_since: str) -> list[dict]:
     out = []
     for r in institutions:
         pub = pick(r, INSTITUTION_FIELDS, set(name_tokens(r.get("owner"))))
@@ -136,6 +170,11 @@ def project_institutions(institutions: list[dict], summary: dict) -> list[dict]:
         pub["penalty_count"] = s.get("count", 0)
         pub["recent_penalty_count"] = s.get("recent", 0)
         pub["last_penalty_date"] = s.get("last_date")
+        # 警示分級：重大處分與罰鍰累計看近五年；廢照是機構的終局事實，不分年。
+        pub["severe_recent_count"] = s.get("severe_recent", 0)
+        pub["fine_recent_total"] = s.get("fine_recent", 0)
+        pub["revoked"] = s.get("revoked", False)
+        pub["dense"] = is_dense(s.get("dates", []), dense_since)
         # 兩種「官方已無、本站仍有」要分開講：
         # removed  ＝ 我方觀測到的下架（有確切日期），護城河的計量單位
         # archived ＝ 2.4 回補的歷史紀錄（removed_at="unknown"，下架日不明）
@@ -154,7 +193,9 @@ def project_penalties(penalties: list[dict], links: dict, inst_names: dict,
                       recent_since: str) -> tuple[list[dict], dict]:
     out, summary = [], defaultdict(
         lambda: {"count": 0, "recent": 0, "last_date": None,
-                 "removed": 0, "archived": 0})
+                 "removed": 0, "archived": 0,
+                 "severe_recent": 0, "fine_recent": 0, "revoked": False,
+                 "dates": []})
     for p in penalties:
         link = links.get(p["id"])
         if not link:
@@ -163,6 +204,7 @@ def project_penalties(penalties: list[dict], links: dict, inst_names: dict,
         names = related_names(p)
         pub = pick(p, PENALTY_FIELDS, names)
         pub["institution_id"] = iid
+        pub["severe"] = is_severe(p.get("sanction"))
         # 處分時名稱與現名不同時保留（機構名屬法人資料，可公開，也是換牌線索）
         former = p.get("institution")
         pub["name_at_penalty"] = (mask_text(former, names)
@@ -170,11 +212,17 @@ def project_penalties(penalties: list[dict], links: dict, inst_names: dict,
         out.append(pub)
         s = summary[iid]
         s["count"] += 1
+        if REVOKED_RE.search((p.get("sanction") or "").replace("\n", "")):
+            s["revoked"] = True
         d = p.get("penalty_date")
         if d:
+            s["dates"].append(d)
             s["last_date"] = max(s["last_date"] or d, d)
             if d >= recent_since:
                 s["recent"] += 1
+                s["fine_recent"] += fine_amount(p.get("sanction"))
+                if pub["severe"]:
+                    s["severe_recent"] += 1
         if p.get("removed_at") == "unknown":
             s["archived"] += 1
         elif p.get("removed_at"):
@@ -235,10 +283,13 @@ def main(argv: list[str]) -> int:
     except ValueError:                       # 2/29
         recent_since = date(year - RECENT_YEARS, month, day - 1).isoformat()
 
+    dense_since = (date(year, month, day)
+                   - timedelta(days=DENSE_LOOKBACK_DAYS)).isoformat()
+
     inst_names = {r["id"]: r["name"] for r in institutions}
     pub_penalties, summary = project_penalties(penalties, links, inst_names,
                                                recent_since)
-    pub_institutions = project_institutions(institutions, summary)
+    pub_institutions = project_institutions(institutions, summary, dense_since)
     # renamed_unlinked 的舊名裡混著人名且未經確認，MVP 不公開
     pub_aliases = [pick(a, ALIAS_FIELDS,
                         set(name_tokens(a.get("former_name")))
@@ -254,6 +305,11 @@ def main(argv: list[str]) -> int:
     log(f"公開層：機構 {len(pub_institutions):,} 家（有裁罰 {with_penalty:,}）、"
         f"裁罰 {len(pub_penalties):,} 筆（我方觀測到下架 {removed:,}、"
         f"歷史存檔 {archived:,}）、別名 {len(pub_aliases)} 組")
+    severe_inst = sum(1 for r in pub_institutions if r["severe_recent_count"])
+    revoked_inst = sum(1 for r in pub_institutions if r["revoked"])
+    dense_inst = sum(1 for r in pub_institutions if r["dense"])
+    log(f"警示分級：近五年有重大處分 {severe_inst} 家、"
+        f"遭廢止設立許可 {revoked_inst} 家、近期密集裁罰 {dense_inst} 家")
     log(f"未進公開層的裁罰 {len(penalties) - len(pub_penalties):,} 筆"
         f"（自然人、未立案、名冊查無等，見 match_unresolved.json）")
 
@@ -271,6 +327,8 @@ def main(argv: list[str]) -> int:
                        "penalties": len(pub_penalties),
                        "removed_penalties": removed,
                        "archived_penalties": archived,
+                       "severe_institutions": severe_inst,
+                       "revoked_institutions": revoked_inst,
                        "aliases": len(pub_aliases)},
             "sources": [
                 {"name": "幼兒園裁罰：全國教保資訊網（教育部）", "url":
@@ -301,8 +359,9 @@ def main(argv: list[str]) -> int:
     # 白名單自我檢查：輸出不得出現白名單以外的欄位
     for rows, allowed, label in ((pub_institutions, INSTITUTION_FIELDS + (
             "penalty_count", "recent_penalty_count", "last_penalty_date",
-            "removed_penalty_count", "archived_penalty_count", "vacancy"), "機構"),
-            (pub_penalties, PENALTY_FIELDS, "裁罰"),
+            "removed_penalty_count", "archived_penalty_count", "vacancy",
+            "severe_recent_count", "fine_recent_total", "revoked", "dense"), "機構"),
+            (pub_penalties, PENALTY_FIELDS + ("severe",), "裁罰"),
             (pub_aliases, ALIAS_FIELDS, "別名")):
         extra = {k for r in rows for k in r} - set(allowed)
         if extra:

@@ -46,6 +46,23 @@ PENALTIES = {
          "doc_no": "北市教幼字第3號", "law": "幼兒教育及照顧法第52條",
          "violation": "第10條", "sanction": "罰鍰：6,000元",
          "penalty_date": "2019-03-03", "removed_at": "unknown", "origin": "kiang"},
+        # 警示分級測資：廢照（實際格式即「廢止設立許可：日期」，無罰鍰）、
+        # 高額罰鍰（>= 30 萬），加一筆輕罰湊成 30 天內 3 筆的密集窗口
+        {"id": "ece:4", "source": "ece", "city": "臺北市", "institution": "臺北市私立甲幼兒園",
+         "school": "臺北市私立甲幼兒園", "person": "負責人：王大明",
+         "doc_no": "北市教幼字第4號", "law": "幼兒教育及照顧法第52條",
+         "violation": "第16條", "sanction": "廢止設立許可：2026/08/01",
+         "penalty_date": "2026-07-01", "removed_at": None, "origin": None},
+        {"id": "ece:5", "source": "ece", "city": "臺北市", "institution": "臺北市私立甲幼兒園",
+         "school": "臺北市私立甲幼兒園", "person": "負責人：王大明",
+         "doc_no": "北市教幼字第5號", "law": "幼兒教育及照顧法第52條",
+         "violation": "第33條", "sanction": "罰鍰：600,000 元",
+         "penalty_date": "2026-07-20", "removed_at": None, "origin": None},
+        {"id": "ece:6", "source": "ece", "city": "臺北市", "institution": "臺北市私立甲幼兒園",
+         "school": "臺北市私立甲幼兒園", "person": "負責人：王大明",
+         "doc_no": "北市教幼字第6號", "law": "幼兒教育及照顧法第52條",
+         "violation": "第10條", "sanction": "罰鍰：6,000 元",
+         "penalty_date": "2026-07-25", "removed_at": None, "origin": None},
     ],
     "sfaa": [
         # 機構名帶括號負責人＋事實摘要直接寫姓名（兩者實測都存在）
@@ -70,6 +87,9 @@ LINKS = {
     "ece:1": {"institution_id": "preschool:a", "method": "exact"},
     "ece:2": {"institution_id": "preschool:a", "method": "exact"},
     "ece:3": {"institution_id": "preschool:a", "method": "exact"},
+    "ece:4": {"institution_id": "preschool:a", "method": "exact"},
+    "ece:5": {"institution_id": "preschool:a", "method": "exact"},
+    "ece:6": {"institution_id": "preschool:a", "method": "exact"},
     "sfaa:1": {"institution_id": "babycare:CW1", "method": "paren_strip"},
 }
 
@@ -137,7 +157,7 @@ def main():
         assert not ({"person", "targets", "files", "school"} & set(pens["ece:1"])), pens["ece:1"]
 
         # 自然人裁罰整筆不進公開層
-        assert "sfaa:2" not in pens and len(pens) == 4, sorted(pens)
+        assert "sfaa:2" not in pens and len(pens) == 7, sorted(pens)
 
         # 自由文字與夾帶姓名的欄位都要遮罩
         assert pens["sfaa:1"]["fact"] == "張○○於托嬰中心不當對待兒童", pens["sfaa:1"]
@@ -151,13 +171,27 @@ def main():
         # 我方觀測到的下架與 2.4 回補的歷史存檔要分開計數
         a = insts["preschool:a"]
         assert (a["penalty_count"], a["removed_penalty_count"],
-                a["archived_penalty_count"]) == (3, 1, 1), a
+                a["archived_penalty_count"]) == (6, 1, 1), a
         # 揭露分層：as_of 2026-08-09 → 近五年自 2021-08-09 起，ece:3（2019）不算
-        assert a["recent_penalty_count"] == 2, a
+        assert a["recent_penalty_count"] == 5, a
         meta = json.loads((out / "meta.json").read_text())
         assert meta["recent_since"] == "2021-08-09" and meta["recent_years"] == 5
-        assert a["last_penalty_date"] == "2024-01-01"
+        assert a["last_penalty_date"] == "2026-07-25"
         assert insts["babycare:CW1"]["penalty_count"] == 1
+
+        # 警示分級（docs/07 方向一）：判定只看 sanction、純轉述官方文字
+        assert pens["ece:4"]["severe"] and pens["ece:5"]["severe"], pens
+        assert not pens["ece:1"]["severe"] and not pens["ece:6"]["severe"]
+        # 廢照＋高額各一筆；累計罰鍰只算近五年（6,000+6,000+600,000+6,000）；
+        # 廢止設立許可是終局事實；07-01／07-20／07-25 落在 30 天窗口內＝密集
+        assert a["severe_recent_count"] == 2, a
+        assert a["fine_recent_total"] == 618_000, a
+        assert a["revoked"] is True and a["dense"] is True, a
+        b = insts["babycare:CW1"]
+        assert (b["severe_recent_count"], b["fine_recent_total"],
+                b["revoked"], b["dense"]) == (0, 60_000, False, False), b
+        assert meta["counts"]["severe_institutions"] == 1
+        assert meta["counts"]["revoked_institutions"] == 1
 
         # 未經確認的換牌線索（舊名裡混著人名）不公開
         aliases = json.loads((out / "aliases.json").read_text())["aliases"]

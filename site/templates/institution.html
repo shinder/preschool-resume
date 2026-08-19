@@ -28,9 +28,21 @@
     <div class="badges">
       <span class="badge">{{ kind_label }}</span>
       {%- if inst.org_type %}<span class="badge">{{ inst.org_type }}</span>{% endif %}
-      {%- if not inst.is_active %}<span class="badge closed">名冊顯示已停辦</span>{% endif %}
+      {#- 廢照與「名冊顯示已停辦」是不同訊息：前者是官方處分（裁罰文字當日
+          即到），後者只是主檔名冊的狀態（月更，最慢晚一個月）。廢照優先。 #}
+      {%- if inst.revoked %}<span class="badge revoked">遭廢止設立許可</span>
+      {%- elif not inst.is_active %}<span class="badge closed">名冊顯示已停辦</span>{% endif %}
       {%- if penalties %}
       <span class="badge alert num">近 {{ recent_years }} 年 {{ penalties|length }} 筆裁罰</span>
+      {%- endif %}
+      {%- if inst.severe_recent_count %}
+      <span class="badge severe num">重大處分 {{ inst.severe_recent_count }} 筆</span>
+      {%- endif %}
+      {%- if inst.dense %}
+      <span class="badge severe">短期密集裁罰</span>
+      {%- endif %}
+      {%- if inst.fine_recent_total %}
+      <span class="badge num">近 {{ recent_years }} 年罰鍰累計 {{ "{:,}".format(inst.fine_recent_total) }} 元</span>
       {%- endif %}
       {%- if older %}
       <span class="badge num">更早 {{ older|length }} 筆</span>
@@ -119,6 +131,7 @@
           <header>
             <time datetime="{{ p.penalty_date }}">{{ p.penalty_date }}</time>
             {%- if p.doc_no %}<span class="docno">{{ p.doc_no }}</span>{% endif %}
+            {%- if p.severe %}<span class="sevmark">重大處分</span>{% endif %}
             <span class="state{% if p.archived %} archived{% endif %}">
               {{- "官方已無、本站保留" if p.archived else "官方公告中" -}}
             </span>

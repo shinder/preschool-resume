@@ -204,7 +204,9 @@ def main(argv: list[str]) -> int:
                "is_active": inst.get("is_active", True),
                # 只有托嬰中心有實際收托數，幼兒園恆為 None（列表頁只在托嬰分頁出欄）。
                # 已停辦者不給空位：停辦後收托歸零，「核定減實際」會算出整批假空位。
-               "vacancy": inst.get("vacancy") if inst.get("is_active", True) else None}
+               "vacancy": inst.get("vacancy") if inst.get("is_active", True) else None,
+               "severe": inst.get("severe_recent_count", 0),
+               "revoked": inst.get("revoked", False)}
         rows_by_id[inst["id"]] = row
         by_city[inst["city"] or "未分類"].append(row)
         if inst.get("town"):

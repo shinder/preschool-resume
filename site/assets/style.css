@@ -186,6 +186,9 @@ a:hover { color: var(--seal); }
   background: var(--field); color: var(--ink-soft); border-radius: 2px;
 }
 .badge.alert { background: var(--seal-soft); border-color: #dcb6b0; color: var(--seal); font-weight: 600; }
+/* 警示分級：severe 是加重版 alert；revoked（廢照）是最重的訊息，唯一的實底徽章 */
+.badge.severe { background: var(--seal-soft); border-color: var(--seal); color: var(--seal); font-weight: 700; }
+.badge.revoked { background: var(--seal); border-color: var(--seal); color: var(--card); font-weight: 700; }
 .badge.closed { background: var(--field); color: #6b7a86; }
 .badge.open { background: var(--indigo-soft); border-color: #c3d4e2; color: var(--indigo); font-weight: 600; }
 .badge.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -233,6 +236,7 @@ a:hover { color: var(--seal); }
 }
 .entry .state { margin-inline-start: auto; font-size: 0.75rem; }
 .entry .state.archived { color: var(--seal); font-weight: 600; }
+.entry .sevmark { font-size: 0.75rem; color: var(--seal); font-weight: 700; letter-spacing: 0.04em; }
 .entry dl { margin: 0; display: grid; gap: 0.4rem 0.9rem; font-size: 0.875rem; }
 @media (min-width: 34rem) { .entry dl { grid-template-columns: 5.5rem 1fr; } }
 .entry dt { color: var(--ink-soft); }
