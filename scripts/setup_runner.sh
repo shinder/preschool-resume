@@ -18,7 +18,13 @@
 # 用法：bash scripts/setup_runner.sh [--dry-run]
 #
 # 注意：解析＋diff 那一軌已於 2026-08-10 搬到 GitHub Actions（.github/workflows/diff.yml），
-# 本腳本**只佈署教保網備份**。若在此安裝 preschool-diff.timer 會與 Actions 打架。
+# 若在此安裝 preschool-diff.timer 會與 Actions 打架。
+#
+# 本腳本佈署台灣 IP 機器上的全部三軌（2026-08-19 前只佈署教保網備份，
+# 換機會漏掉後兩軌，watchdog 要等 8／35 天的容許期過了才會發現）：
+#   preschool-backup       每日 06:30  教保網裁罰備份
+#   preschool-ncwis        週六 04:30  托嬰中心主檔週更
+#   preschool-ece-schools  每月 1 號 01:00  幼兒園主檔月更
 
 set -euo pipefail
 
@@ -80,23 +86,27 @@ if ! $DRY_RUN; then
   git -C "$DATA_DIR" config user.email "$(git -C "$DATA_DIR" config user.email || echo shinder.lin@gmail.com)"
 fi
 
-say "安裝 systemd 單元（僅教保網備份；diff 已在 Actions）"
-for unit in preschool-backup.service preschool-backup.timer; do
-  run "sudo install -m 644 '$CODE_DIR/scripts/systemd/$unit' /etc/systemd/system/$unit"
+say "安裝 systemd 單元（三軌；diff 已在 Actions）"
+TIMERS=""
+for name in preschool-backup preschool-ncwis preschool-ece-schools; do
+  for ext in service timer; do
+    run "sudo install -m 644 '$CODE_DIR/scripts/systemd/$name.$ext' /etc/systemd/system/$name.$ext"
+  done
+  TIMERS="$TIMERS $name.timer"
 done
 run "sudo systemctl daemon-reload"
-run "sudo systemctl enable --now preschool-backup.timer"
+run "sudo systemctl enable --now$TIMERS"
 
 say "驗收"
 if $DRY_RUN; then
   echo "[dry-run] 略過驗收"
 else
-  systemctl list-timers preschool-backup.timer --no-pager
+  systemctl list-timers 'preschool-*' --no-pager
   echo
   echo "下一步："
   echo "  1. 手動跑一次確認能連上教保網並推得上去："
   echo "       bash $CODE_DIR/scripts/local_backup.sh && tail -5 ~/preschool-backup.log"
   echo "  2. 確認心跳有進資料 repo：git -C $DATA_DIR show --stat HEAD"
-  echo "  3. 舊機器若還活著，把它的 timer 停掉，避免兩台同時抓："
-  echo "       sudo systemctl disable --now preschool-backup.timer"
+  echo "  3. 舊機器若還活著，把它的三個 timer 都停掉，避免兩台同時抓："
+  echo "       sudo systemctl disable --now preschool-backup.timer preschool-ncwis.timer preschool-ece-schools.timer"
 fi
