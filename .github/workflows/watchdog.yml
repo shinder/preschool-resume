@@ -11,7 +11,7 @@
 #     ncwis      ：old-mini systemd 每週六 04:30（scripts/local_ncwis.sh）
 #     ece_schools：old-mini systemd 每月 1 號 01:00（scripts/local_ece_schools.sh）
 #
-# 本 workflow 每日台北 12:00 檢查。每日軌要求「心跳是今天的」；低頻軌要求
+# 本 workflow 每日台北 14:00 檢查。每日軌要求「心跳是今天的」；低頻軌要求
 # 「心跳在容許天數內」——否則週更、月更的工作每天都會誤報。
 #
 # 原本排台北 09:30，只比 site 名義上的 09:00 晚半小時。但 Actions 的排程延遲
@@ -19,6 +19,9 @@
 # 跑完，看到昨天的心跳就誤報「site 心跳過期」。假警報收多了會連真警報一起被
 # 忽略，所以往後推到 12:00：本軌不能綁 workflow_run（還要等 old-mini 那三軌，
 # 跨機器串不起來），只能靠夠大的緩衝，而緩衝本身不花任何成本。
+# 2026-08-19 再從 12:00 推到 14:00：diff 名義 08:30、實測延遲可達 2.5 小時
+# （08-12），加上 site 接續建站的時間，12:00 檢查只剩約一小時餘裕；推到 14:00
+# 把餘裕拉回三小時以上，理由同上——緩衝不花成本，假警報才貴。
 #
 # 低頻軌本來完全不在監控內，於是「默默死掉沒人知道」：一個週更的工作停擺，
 # 可能好幾個月後才從資料上看出來。容許天數留一次補跑的餘裕（週更 8 天、月更 35 天）。
@@ -36,14 +39,34 @@ name: watchdog
 
 on:
   schedule:
-    - cron: "0 4 * * *" # UTC 04:00 ＝ 台北 12:00
+    - cron: "0 6 * * *" # UTC 06:00 ＝ 台北 14:00
   workflow_dispatch:
 
 jobs:
   watchdog:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      actions: write # keepalive 步驟要呼叫 workflow enable API
     steps:
+      # GitHub 對 60 天無 commit 活動的 repo 會自動停用 scheduled workflows
+      # （文件寫 public repo 適用；本 repo 目前 private，但規則若變、或日後
+      # 開源就會中招）。日常 commit 都推去資料 repo，程式 repo 進入維護期
+      # 可能兩個月沒動，屆時 backup、diff 連同本軌一起被靜默停用——watchdog
+      # 防的就是「默默死掉沒人知道」，卻防不到自己。每天呼叫 enable API
+      # 重設閒置計時器，成本三次 API 呼叫，規則不適用時也無副作用。
+      # site.yml 由 diff 的 workflow_run 觸發、不吃 schedule，不在此列。
+      # API 偶發失敗不值得讓 watchdog 變紅（假警報才貴），只印警告；
+      # 若真的被停用，GitHub 會先寄提醒信，這裡是第二道保險。
+      - name: Keepalive（重設 60 天閒置停用計時器）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in backup.yml diff.yml watchdog.yml; do
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$wf/enable" \
+              || echo "::warning::keepalive 失敗（$wf），下次排程會再試"
+          done
+
       - name: Checkout 資料 repo（僅 status/）
         uses: actions/checkout@v5
         with:
