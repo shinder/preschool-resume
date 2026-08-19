@@ -80,9 +80,9 @@ jobs:
             echo "無任何變更（同日重跑）"
           elif git diff --cached --quiet -- . ':!status'; then
             git commit -q -m "心跳 $(TZ=Asia/Taipei date +%F)（diff exit=$RC）"
-            git pull --rebase --quiet && git push -q
+            bash "$GITHUB_WORKSPACE/scripts/git_push_retry.sh"
           else
             git commit -q -m "解析 $(TZ=Asia/Taipei date +%F)：penalties 現況與事件"
-            git pull --rebase --quiet && git push -q
+            bash "$GITHUB_WORKSPACE/scripts/git_push_retry.sh"
           fi
           exit "$RC"

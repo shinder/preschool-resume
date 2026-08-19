@@ -69,15 +69,16 @@ jobs:
           git config user.name "backup-bot"
           git config user.email "shinder.lin@gmail.com"
           # 全量模式一跑一個多小時，期間本機 launchd 備份（ece／托嬰）可能已推新 commit，
-          # 直接 push 會被 non-fast-forward 拒絕（2026-08-15 實際踩到），先 rebase 再推。
+          # 直接 push 會被 non-fast-forward 拒絕（2026-08-15 實際踩到），
+          # 用共用腳本先 rebase 再推、被拒就重試。
           if git diff --cached --quiet; then
             echo "無任何變更（同日重跑）"
           elif git diff --cached --quiet -- . ':!status'; then
             git commit -m "心跳 $(TZ=Asia/Taipei date +%F)（sfaa）"
-            git pull --rebase --quiet && git push -q
+            bash "$GITHUB_WORKSPACE/scripts/git_push_retry.sh"
           else
             git commit -m "備份 $(TZ=Asia/Taipei date +%F)（${{ steps.mode.outputs.mode }}）"
-            git pull --rebase --quiet && git push -q
+            bash "$GITHUB_WORKSPACE/scripts/git_push_retry.sh"
           fi
 
       - name: 回報爬蟲失敗
