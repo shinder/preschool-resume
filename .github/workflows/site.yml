@@ -34,8 +34,11 @@ on:
     types: [completed]
   workflow_dispatch:
     inputs:
-      index:
-        description: "開放搜尋引擎索引（6b 才用；預設維持 noindex）"
+      # 2026-08-22 解除 noindex（6b 之 6.7）：預設即開放索引。
+      # workflow_run 事件沒有 inputs，這個布林在排程下永遠是空值（falsy），
+      # 所以「預設開索引」的語意對每日排程與手動觸發都成立。
+      noindex:
+        description: "緊急回退：重新掛上 noindex（發現重大內容錯誤時用）"
         type: boolean
         default: false
 
@@ -102,7 +105,7 @@ jobs:
           python3 site/build.py \
             --public build/public --out build/site \
             ${BASE_URL:+--base-url "$BASE_URL"} \
-            ${{ inputs.index && '--index' || '' }}
+            ${{ inputs.noindex && '' || '--index' }}
 
       # v3 預設裝 wrangler 3.90.0，那個版本還不支援「只有 assets、沒有 main」的
       # 純靜態資產 Worker，會在認證之前就以 "Missing entry-point" 失敗
