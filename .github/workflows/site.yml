@@ -48,6 +48,11 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # 明列權限（repo 已公開，least privilege）：contents write 供公開層 dump
+    # 的 gh release 用；checkout 本 repo 只需 read，被 write 涵蓋。
+    # 資料 repo 的 checkout／push 走 ssh key，不吃這個 token。
+    permissions:
+      contents: write
     steps:
       - name: Checkout 程式碼
         uses: actions/checkout@v5
@@ -108,6 +113,24 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # 公開層 dump 釋出（docs/09 待決 1 之決議：全開放）。rolling release
+      # 「public-data」資產每日覆蓋，不逐日開 tag——penalties.json 本身就是
+      # 累積資料集（含官方已下架、本站保留者），時點見 meta.json 的 as_of；
+      # 逐日完整歷史在私有資料 repo 的 git 裡。四檔皆為 6.3 公開層產物，
+      # 已過白名單重建、全欄位遮罩、姓名稽核三道防線，與站台同一口徑——
+      # 絕不可改上傳資料 repo 的原始檔。放在部署成功之後：建站或部署失敗
+      # 時不釋出，與「寧可不更新」一致。
+      - name: 釋出公開層 dump
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view public-data -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create public-data -R "$GITHUB_REPOSITORY" \
+              --title "公開層資料（每日更新）" \
+              --notes "建站用公開層四檔（institutions／penalties／aliases／meta），本站彙整部分以 CC BY 4.0 釋出，原始政府資料依政府資料開放授權條款第 1 版標示來源，詳見 README 授權節。資料時點見 meta.json 的 as_of。"
+          gh release upload public-data build/public/*.json --clobber \
+            -R "$GITHUB_REPOSITORY"
 
       - name: 寫入心跳檔（供 watchdog 檢查）
         if: always()

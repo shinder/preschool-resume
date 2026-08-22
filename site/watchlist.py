@@ -12,7 +12,10 @@
 白名單把關，owner 本來就不輸出）。負責人換人頭開新園抓不到，這是姓名歸戶
 方法的天花板（docs/07）。
 
-告警通道：GitHub issue（gh CLI，內容含姓名故 repo 必須是 private）。
+告警通道：GitHub issue（gh CLI）。內容含姓名，只能開在 private repo——
+程式 repo 已於 2026-08-22 轉公開，故預設開在維持私有的資料 repo；
+CI 需要 fine-grained PAT（WATCHLIST_ISSUE_TOKEN），github.token 對外部
+repo 無權。
 已告警的（機構 id × 姓名）記在資料 repo 的 data/watchlist_state.json，
 成功開 issue 才記錄——重跑冪等、不重複開單；開單失敗下次重試。
 
@@ -108,7 +111,7 @@ def main(argv: list[str]) -> int:
 
     repo_dir = Path(__file__).resolve().parent.parent
     data_dir = Path(opt("--data-dir", repo_dir.parent / "preschool-resume-data"))
-    repo = opt("--repo", "shinder/preschool-resume")
+    repo = opt("--repo", "shinder/preschool-resume-data")
     dry_run = "--dry-run" in argv
 
     def load(rel: str, key: str, default=None):

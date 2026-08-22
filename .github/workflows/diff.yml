@@ -93,14 +93,20 @@ jobs:
       # 內部監看（docs/07 方向二之 1）：觀察名單（廢照／終身處分機構的負責人）
       # 名下另有現存機構即開 issue 告警，人工查證後在 issue 記結論。
       # 主檔由 site 軌更新（幼兒園月更、托嬰週更），每日比對冪等；開單成功才
-      # 記 state、不重複開單。告警內容含姓名，本 repo 為 private 才能用 issue
-      # 當通道；一切不進公開層（owner 本來就不在公開層白名單）。
+      # 記 state、不重複開單。告警內容含姓名，本 repo 2026-08-22 轉公開後
+      # issue 改開在維持私有的資料 repo；一切不進公開層（owner 本來就不在
+      # 公開層白名單）。github.token 對外部 repo 無權，需 fine-grained PAT
+      # secrets.WATCHLIST_ISSUE_TOKEN（preschool-resume-data 的 Issues 寫入）。
       # 放在 diff 成功之後：diff 失敗時上一步已 exit 非零，本步不會跑。
+      # 告警是旁路訊號：開單失敗（含 PAT 未設）只記 log，state 不記、明日
+      # 重試，不讓整軌轉紅——否則 site 軌會因 workflow_run 失敗而不建站。
       - name: 內部監看：觀察名單負責人另營機構
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.WATCHLIST_ISSUE_TOKEN }}
         run: |
-          python3 site/watchlist.py --data-dir data --repo "$GITHUB_REPOSITORY"
+          python3 site/watchlist.py --data-dir data \
+            --repo shinder/preschool-resume-data \
+            || echo "告警開單失敗（見上方 log），明日重試；不擋管線"
           cd data
           # Actions 的 run 是 bash -e：不能寫「[ -f ] && git add」，
           # 檔案不存在時整步會以 exit 1 收場
