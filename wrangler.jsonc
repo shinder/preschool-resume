@@ -8,9 +8,10 @@
 {
   "name": "preschool-resume",
   "compatibility_date": "2026-08-09",
-  // 自訂網域由 wrangler 建立，不必自己設 DNS 或憑證；前提是 ggggg.app 這個
-  // zone 已在同一個 Cloudflare 帳號下。`.app` 在 HSTS preload 清單上，強制 HTTPS。
-  "routes": [{ "pattern": "preschool.ggggg.app", "custom_domain": true }],
+  // 自訂網域由 wrangler 建立，不必自己設 DNS 或憑證；前提是 shinder.work 這個
+  // zone 已在同一個 Cloudflare 帳號下。2026-08-22 自 preschool.ggggg.app 遷入，
+  // 當時仍 noindex、未被收錄，舊網域直接拆除、不設 301。
+  "routes": [{ "pattern": "preschool.shinder.work", "custom_domain": true }],
   // 關掉 workers.dev 子網域：同一份內容掛在兩個網址會產生重複內容，
   // 且日後只想維護一個正式網址。
   "workers_dev": false,

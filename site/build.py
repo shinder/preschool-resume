@@ -153,7 +153,7 @@ def main(argv: list[str]) -> int:
     repo = Path(__file__).resolve().parent.parent
     public = Path(opt("--public", repo / "build" / "public"))
     out = Path(opt("--out", repo / "build" / "site"))
-    base_url = opt("--base-url", "https://preschool.ggggg.app").rstrip("/")
+    base_url = opt("--base-url", "https://preschool.shinder.work").rstrip("/")
     noindex = "--index" not in argv
 
     if not (public / "institutions.json").exists():

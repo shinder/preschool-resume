@@ -166,7 +166,7 @@ def main():
         ElementTree.fromstring((out / "assets/favicon.svg").read_text())
 
         # 聯絡方式：每頁頁尾都有，關於頁另有更正原則
-        assert 'mailto:service@ggggg.app' in page
+        assert 'mailto:service@shinder.work' in page
         about = (out / "about.html").read_text()
         assert "更正原則" in about and "不因當事人要求而刪除" in about
 
