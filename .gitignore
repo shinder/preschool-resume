@@ -4,3 +4,4 @@ build/
 .venv/
 .playwright-mcp/
 /*.png
+.wrangler/
