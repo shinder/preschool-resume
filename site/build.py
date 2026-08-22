@@ -379,6 +379,15 @@ def main(argv: list[str]) -> int:
             write(out / "assets" / f.name, text)
             files += 1
 
+    # 站根靜態檔（如搜尋引擎的站主驗證檔）：site/root/ 下的檔案原樣複製到
+    # 產物根目錄。這類檔案必須在根路徑才有效，放 assets/ 不行。
+    root_files = repo / "site" / "root"
+    if root_files.is_dir():
+        for f in sorted(root_files.iterdir()):
+            if f.is_file():
+                write(out / f.name, f.read_text(encoding="utf-8"))
+                files += 1
+
     log(f"產出 {files:,} 檔於 {out}：機構 {len(institutions):,}、"
         f"縣市 {len(city_cards)}、鄉鎮市區 {len(by_town)}；"
         f"地圖點位 {len(located):,}（近五年有裁罰 {len(penalized):,}；"
