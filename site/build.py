@@ -379,8 +379,13 @@ def main(argv: list[str]) -> int:
             write(out / "assets" / f.name, text)
             files += 1
 
-    # 站根靜態檔（如搜尋引擎的站主驗證檔）：site/root/ 下的檔案原樣複製到
+    # 站根靜態檔（如 ads.txt、security.txt）：site/root/ 下的檔案原樣複製到
     # 產物根目錄。這類檔案必須在根路徑才有效，放 assets/ 不行。
+    #
+    # 檔名不要取 .html。wrangler.jsonc 的 html_handling auto-trailing-slash
+    # 會把 /foo.html 以 307 導向 /foo，凡是要求該網址「直接回 200」的驗證
+    # 機制都會失敗——2026-08-23 GSC 站主驗證改走 DNS TXT（shinder.work 網域
+    # 資源，TXT 在頂點）就是踩到這一點，原本的 HTML 驗證檔已移除。
     root_files = repo / "site" / "root"
     if root_files.is_dir():
         for f in sorted(root_files.iterdir()):
