@@ -283,6 +283,38 @@ def main():
         finally:
             tpl.write_text(original, encoding="utf-8")
 
+    # sitemap lastmod：內容沒變的頁沿用上次日期，變了才標新的資料更新日。
+    # 全站每天都標今天，Google 會判定 lastmod 不可信而整欄忽略。
+    with tempfile.TemporaryDirectory() as tmp:
+        public, out = Path(tmp) / "public", Path(tmp) / "site"
+        state = Path(tmp) / "lastmod.json"
+        public.mkdir()
+
+        def build_on(as_of, payloads):
+            for name, payload in payloads.items():
+                payload["as_of"] = as_of
+                (public / name).write_text(json.dumps(payload, ensure_ascii=False))
+            assert build.main(["--public", str(public), "--out", str(out),
+                               "--lastmod-state", str(state)]) == 0
+            import re as _re3
+            return dict(_re3.findall(r"<loc>https://[^/]+(/[^<]*)</loc>"
+                                     r"<lastmod>([^<]+)</lastmod>",
+                                     (out / "sitemap.xml").read_text()))
+
+        first = build_on("2026-08-09", json.loads(json.dumps(PUBLIC)))
+        assert set(first.values()) == {"2026-08-09"}      # 首次全標當天
+        payloads = json.loads(json.dumps(PUBLIC))
+        payloads["institutions.json"]["records"][2]["enrolled"] = 28
+        second = build_on("2026-08-10", payloads)
+        changed = {u for u, d in second.items() if d == "2026-08-10"}
+        # 頁尾的資料更新日不算變動；改了托嬰中心收托數，只有它與所在列表頁變
+        assert "/i/CW1" in changed and "/i/a" not in changed, changed
+        assert "/about" not in changed, changed
+        assert second["/i/a"] == "2026-08-09"
+        assert all(u.startswith(("/i/CW1", "/city/")) or u == "/" for u in changed), changed
+        # 歷史檔一行一筆，供 git diff 閱讀
+        assert len(state.read_text().splitlines()) == len(second) + 2
+
     print("test_build：全部通過")
 
 

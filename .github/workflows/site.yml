@@ -110,6 +110,7 @@ jobs:
           python3 site/build.py \
             --public build/public --out build/site \
             ${BASE_URL:+--base-url "$BASE_URL"} \
+            --lastmod-state data/data/site_lastmod.json \
             ${{ inputs.noindex && '' || '--index' }}
 
       # v3 預設裝 wrangler 3.90.0，那個版本還不支援「只有 assets、沒有 main」的
@@ -121,6 +122,18 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # sitemap lastmod 的歷史檔（build.py 的 sitemap_lastmod()）放在部署成功
+      # 之後才提交：部署失敗時這次的內容變動沒有上線，不能記成已發布，
+      # 否則明天指紋相同、lastmod 就停在舊日期，Google 收不到這次的變動訊號。
+      - name: 提交 sitemap lastmod 歷史檔
+        run: |
+          cd data
+          git add data/site_lastmod.json
+          git diff --cached --quiet || {
+            git commit -m "sitemap lastmod $(TZ=Asia/Taipei date +%F)"
+            bash "$GITHUB_WORKSPACE/scripts/git_push_retry.sh"
+          }
 
       # 公開層 dump 釋出（docs/09 待決 1 之決議：全開放）。rolling release
       # 「public-data」資產每日覆蓋，不逐日開 tag——penalties.json 本身就是

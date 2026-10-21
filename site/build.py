@@ -11,10 +11,13 @@
   中止。Jinja2 已全域自動逸出，這道是防止日後有人加 `|safe`。
 
 用法：.venv/bin/python site/build.py [--public PATH] [--out PATH]
-      [--base-url URL] [--index]
+      [--base-url URL] [--index] [--lastmod-state PATH]
       --index  移除 noindex（6b 掛上正式網域後才用）
+      --lastmod-state  sitemap lastmod 的歷史檔（見 sitemap_lastmod()）；
+               不給則每頁都標資料更新日
 """
 
+import hashlib
 import json
 import sys
 from collections import Counter, defaultdict
@@ -135,6 +138,42 @@ def dangerous_strings(*records) -> list[str]:
     return sorted(out)
 
 
+def fingerprint(html: str, as_of: str) -> str:
+    """頁面內容指紋，供 sitemap lastmod 判斷「這頁是否真的變了」。
+
+    每頁頁尾都印資料更新日，不剔除的話每天全站都算變動。"""
+    return hashlib.sha1(html.replace(as_of, "").encode("utf-8")).hexdigest()[:16]
+
+
+def sitemap_lastmod(fps: dict[str, str], state_path: Path | None,
+                    as_of: str) -> dict[str, str]:
+    """網址 → lastmod。指紋與上次相同就沿用上次的日期，變了才標今天。
+
+    原本全站一律標建置日（每天 1 萬筆都「剛更新」），Google 會判定 lastmod
+    不可信而整欄忽略，等於失去「哪幾頁有新裁罰」這個重新檢索的訊號。
+    2026-10-21 查 GSC：上線兩個月 preschool 0 頁收錄、90 天只被檢索 17 次。
+
+    歷史檔格式 {網址: [指紋, 日期]}，一行一筆以利 git diff。消失的網址
+    自然不寫回。檔案由呼叫端在部署成功後才提交（見 site.yml），部署失敗
+    時這次的變動不會被記成「已發布」。"""
+    if state_path is None:
+        return {u: as_of for u in fps}
+    old = {}
+    if state_path.exists():
+        old = json.loads(state_path.read_text(encoding="utf-8"))
+    state = {u: (old[u] if u in old and old[u][0] == fp else [fp, as_of])
+             for u, fp in sorted(fps.items())}
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        "{\n" + ",\n".join(f"{json.dumps(u)}: {json.dumps(v)}"
+                            for u, v in state.items()) + "\n}\n",
+        encoding="utf-8")
+    changed = sum(1 for u, v in state.items() if old.get(u, [None])[0] != v[0])
+    log(f"sitemap lastmod：{len(state):,} 頁中 {changed:,} 頁內容有變，標為 {as_of}"
+        f"（歷史檔 {'新建' if not old else '沿用'}）")
+    return {u: v[1] for u, v in state.items()}
+
+
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -144,7 +183,7 @@ def main(argv: list[str]) -> int:
     def opt(name: str, default=None):
         return argv[argv.index(name) + 1] if name in argv else default
 
-    known = {"--public", "--out", "--base-url", "--index"}
+    known = {"--public", "--out", "--base-url", "--index", "--lastmod-state"}
     for a in argv:
         if a.startswith("--") and a not in known:
             log(f"未知參數：{a}")
@@ -155,6 +194,7 @@ def main(argv: list[str]) -> int:
     out = Path(opt("--out", repo / "build" / "site"))
     base_url = opt("--base-url", "https://preschool.shinder.work").rstrip("/")
     noindex = "--index" not in argv
+    lastmod_state = Path(opt("--lastmod-state")) if "--lastmod-state" in argv else None
 
     if not (public / "institutions.json").exists():
         log(f"缺少公開層資料，請先執行 site/public_data.py：{public}")
@@ -217,6 +257,7 @@ def main(argv: list[str]) -> int:
                                            -(r["penalty_count"] or 0), r["name"]))
 
     urls = [{"path": "/", "priority": "1.0"}, {"path": href("/about.html")}]
+    fps = {}  # 網址 → 內容指紋，供 sitemap lastmod
     files = 0
 
     # ---------- 機構頁 ----------
@@ -262,6 +303,7 @@ def main(argv: list[str]) -> int:
         write(out / path.lstrip("/"), html)
         files += 1
         urls.append({"path": href(path), "priority": "0.8" if rows else None})
+        fps[href(path)] = fingerprint(html, as_of)
 
     # ---------- 縣市頁與鄉鎮市區頁 ----------
     city_cards = []
@@ -278,6 +320,7 @@ def main(argv: list[str]) -> int:
         write(out / city_path(city).lstrip("/"), html)
         files += 1
         urls.append({"path": href(city_path(city)), "priority": "0.6"})
+        fps[href(city_path(city))] = fingerprint(html, as_of)
         city_cards.append({"name": city, "url": href(city_path(city)),
                            "total": len(rows),
                            "penalized": sum(1 for r in rows
@@ -294,12 +337,17 @@ def main(argv: list[str]) -> int:
         write(out / town_path(city, town).lstrip("/"), html)
         files += 1
         urls.append({"path": href(town_path(city, town)), "priority": "0.5"})
+        fps[href(town_path(city, town))] = fingerprint(html, as_of)
 
     # ---------- 首頁、關於頁 ----------
-    write(out / "index.html", env.get_template("index.html").render(
-        counts=meta["counts"], cities=city_cards, canonical="/"))
-    write(out / "about.html", env.get_template("about.html").render(
-        counts=meta["counts"], sources=meta["sources"], canonical=href("/about.html")))
+    html = env.get_template("index.html").render(
+        counts=meta["counts"], cities=city_cards, canonical="/")
+    write(out / "index.html", html)
+    fps["/"] = fingerprint(html, as_of)
+    html = env.get_template("about.html").render(
+        counts=meta["counts"], sources=meta["sources"], canonical=href("/about.html"))
+    write(out / "about.html", html)
+    fps[href("/about.html")] = fingerprint(html, as_of)
     write(out / "404.html", env.get_template("404.html").render())
     files += 3
 
@@ -341,6 +389,9 @@ def main(argv: list[str]) -> int:
     files += 2
 
     # ---------- sitemap 與 robots ----------
+    lastmod = sitemap_lastmod(fps, lastmod_state, as_of)
+    for u in urls:
+        u["lastmod"] = lastmod[u["path"]]
     write(out / "sitemap.xml", env.get_template("sitemap.xml").render(urls=urls))
     # 帶 kind 前綴的舊機構網址（2026-08-10 上線的第一版）轉到新網址。
     # Workers 靜態資產的 _redirects：動態規則上限 100 條，這裡用 2 條。
