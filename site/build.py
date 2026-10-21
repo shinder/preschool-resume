@@ -269,6 +269,21 @@ def main(argv: list[str]) -> int:
         log(f"中止：機構路徑重複 {len(dupes)} 條，如 {dupes[:3]}")
         return 1
 
+    # 同品牌提示（docs/07 方向一之 4）：清單與驗證在 public_data.brand_link_map，
+    # 這裡只把其他成員的處分狀況攤開。廢照排最前，其次依近期重大處分與件數。
+    inst_by_id = {i["id"]: i for i in institutions}
+
+    def brand_related(inst: dict) -> list[dict]:
+        links = inst.get("brand_links") or {}
+        others = [inst_by_id[i] for i in links.get("ids", []) if i in inst_by_id]
+        others.sort(key=lambda o: (not o.get("revoked"), -(o.get("severe_recent_count") or 0),
+                                   -(o.get("recent_penalty_count") or 0), o["name"]))
+        return [{"name": o["name"], "url": href(inst_path(o)),
+                 "revoked": o.get("revoked", False), "revoked_date": o.get("revoked_date"),
+                 "is_active": o.get("is_active", True),
+                 "recent": o.get("recent_penalty_count", 0),
+                 "severe": o.get("severe_recent_count", 0)} for o in others]
+
     escape_failures = []
     for inst in institutions:
         path = inst_path(inst)
@@ -287,6 +302,8 @@ def main(argv: list[str]) -> int:
             city_url=href(city_path(inst["city"])) if inst.get("city") else "/",
             town_url=href(town_path(inst["city"], inst["town"])) if inst.get("town") else None,
             neighbours=order(siblings)[:NEIGHBOUR_LIMIT],
+            brand=(inst.get("brand_links") or {}).get("brand"),
+            brand_related=brand_related(inst),
             full_url=external(inst.get("url")), jsonld=jsonld_for(inst, url),
             map_url=map_link(inst),
             coverage_from=coverage.get(inst["source"], as_of)[:4],

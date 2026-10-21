@@ -60,6 +60,8 @@ RECENT_YEARS = 5
 SEVERE_FINE = 300_000
 SEVERE_RE = re.compile(r"廢止|終身")
 REVOKED_RE = re.compile(r"廢止.{0,6}設立許可")
+# 「廢止設立許可：2026/07/29」——處分生效日；抓不到就退回處分日
+REVOKED_DATE_RE = re.compile(r"廢止.{0,6}設立許可\D{0,3}(\d{4})/(\d{1,2})/(\d{1,2})")
 FINE_RE = re.compile(r"(\d[\d,]*)\s*元")
 # 密集裁罰（方向一之 3）：近一年內存在 30 天窗口 >= 3 筆，代表被密集稽查中。
 # 限定近一年——三年前的密集稽查不是「現在進行式」，掛徽章會誤導。
@@ -161,8 +163,31 @@ def build_name_scanner(penalties: list[dict], institutions: list[dict]) -> set[s
     return {n for n in names if n not in inst_blob}
 
 
+def brand_link_map(groups: list[dict], inst_by_id: dict) -> dict[str, dict]:
+    """同品牌提示（docs/07 方向一之 4，保守版）：機構 id → {brand, ids}。
+
+    只收資料 repo `data/brand_links.json` 裡人工查證過的組合，不做自動比對——
+    同名不同經營者的誤關聯會實質傷害無辜園所。公開層只輸出品牌字串與其他
+    成員 id；查證依據（basis）、負責人一律不出去。
+
+    驗證不過的組（成員不存在、品牌字串不在名稱裡、少於兩家）略過並記錄，
+    不中止建置：人工清單打錯字不該讓每日裁罰更新停擺。"""
+    out = {}
+    for g in groups:
+        brand, ids = g.get("brand") or "", g.get("members") or []
+        bad = [i for i in ids if i not in inst_by_id
+               or brand not in inst_by_id[i]["name"]]
+        if len(brand) < 2 or len(set(ids)) < 2 or bad:
+            log(f"同品牌清單：略過「{brand}」組（無效成員 {bad or ids}）")
+            continue
+        for i in ids:
+            out[i] = {"brand": brand, "ids": [j for j in ids if j != i]}
+    return out
+
+
 def project_institutions(institutions: list[dict], summary: dict,
-                         dense_since: str) -> list[dict]:
+                         dense_since: str,
+                         brand_links: dict | None = None) -> list[dict]:
     out = []
     for r in institutions:
         pub = pick(r, INSTITUTION_FIELDS, set(name_tokens(r.get("owner"))))
@@ -174,6 +199,8 @@ def project_institutions(institutions: list[dict], summary: dict,
         pub["severe_recent_count"] = s.get("severe_recent", 0)
         pub["fine_recent_total"] = s.get("fine_recent", 0)
         pub["revoked"] = s.get("revoked", False)
+        pub["revoked_date"] = s.get("revoked_date")
+        pub["brand_links"] = (brand_links or {}).get(r["id"])
         pub["dense"] = is_dense(s.get("dates", []), dense_since)
         # 兩種「官方已無、本站仍有」要分開講：
         # removed  ＝ 我方觀測到的下架（有確切日期），護城河的計量單位
@@ -195,7 +222,7 @@ def project_penalties(penalties: list[dict], links: dict, inst_names: dict,
         lambda: {"count": 0, "recent": 0, "last_date": None,
                  "removed": 0, "archived": 0,
                  "severe_recent": 0, "fine_recent": 0, "revoked": False,
-                 "dates": []})
+                 "revoked_date": None, "dates": []})
     for p in penalties:
         link = links.get(p["id"])
         if not link:
@@ -212,9 +239,14 @@ def project_penalties(penalties: list[dict], links: dict, inst_names: dict,
         out.append(pub)
         s = summary[iid]
         s["count"] += 1
-        if REVOKED_RE.search((p.get("sanction") or "").replace("\n", "")):
-            s["revoked"] = True
         d = p.get("penalty_date")
+        sanction = (p.get("sanction") or "").replace("\n", "")
+        if REVOKED_RE.search(sanction):
+            s["revoked"] = True
+            m = REVOKED_DATE_RE.search(sanction)
+            when = (f"{m[1]}-{int(m[2]):02d}-{int(m[3]):02d}" if m else d)
+            if when:
+                s["revoked_date"] = max(s["revoked_date"] or when, when)
         if d:
             s["dates"].append(d)
             s["last_date"] = max(s["last_date"] or d, d)
@@ -289,7 +321,13 @@ def main(argv: list[str]) -> int:
     inst_names = {r["id"]: r["name"] for r in institutions}
     pub_penalties, summary = project_penalties(penalties, links, inst_names,
                                                recent_since)
-    pub_institutions = project_institutions(institutions, summary, dense_since)
+    brand_path = data_dir / "data" / "brand_links.json"
+    brand_links = brand_link_map(
+        json.loads(brand_path.read_text(encoding="utf-8"))["groups"]
+        if brand_path.exists() else [],
+        {r["id"]: r for r in institutions})
+    pub_institutions = project_institutions(institutions, summary, dense_since,
+                                            brand_links)
     # renamed_unlinked 的舊名裡混著人名且未經確認，MVP 不公開
     pub_aliases = [pick(a, ALIAS_FIELDS,
                         set(name_tokens(a.get("former_name")))
@@ -309,7 +347,8 @@ def main(argv: list[str]) -> int:
     revoked_inst = sum(1 for r in pub_institutions if r["revoked"])
     dense_inst = sum(1 for r in pub_institutions if r["dense"])
     log(f"警示分級：近五年有重大處分 {severe_inst} 家、"
-        f"遭廢止設立許可 {revoked_inst} 家、近期密集裁罰 {dense_inst} 家")
+        f"遭廢止設立許可 {revoked_inst} 家、近期密集裁罰 {dense_inst} 家、"
+        f"同品牌提示 {len(brand_links)} 家")
     log(f"未進公開層的裁罰 {len(penalties) - len(pub_penalties):,} 筆"
         f"（自然人、未立案、名冊查無等，見 match_unresolved.json）")
 
@@ -360,7 +399,8 @@ def main(argv: list[str]) -> int:
     for rows, allowed, label in ((pub_institutions, INSTITUTION_FIELDS + (
             "penalty_count", "recent_penalty_count", "last_penalty_date",
             "removed_penalty_count", "archived_penalty_count", "vacancy",
-            "severe_recent_count", "fine_recent_total", "revoked", "dense"), "機構"),
+            "severe_recent_count", "fine_recent_total", "revoked", "dense",
+            "revoked_date", "brand_links"), "機構"),
             (pub_penalties, PENALTY_FIELDS + ("severe",), "裁罰"),
             (pub_aliases, ALIAS_FIELDS, "別名")):
         extra = {k for r in rows for k in r} - set(allowed)

@@ -198,6 +198,28 @@ def main():
         assert [x["type"] for x in aliases] == ["renamed"], aliases
         assert "penalty_ids" not in aliases[0]          # 白名單外欄位
 
+    # 同品牌提示（docs/07 方向一之 4）：只收人工清單、且品牌字串真的在名稱裡的組；
+    # 查證依據不得外流。品牌不符的組略過但不中止建置。
+    with tempfile.TemporaryDirectory() as tmp:
+        d, out = Path(tmp) / "data-repo", Path(tmp) / "out"
+        d.mkdir()
+        setup(d)
+        (d / "data/brand_links.json").write_text(json.dumps({"groups": [
+            {"brand": "私立", "members": ["preschool:a", "babycare:CW1"],
+             "basis": "負責人王大明，watchlist issue #1"},
+            {"brand": "甲", "members": ["preschool:a", "babycare:CW1"]},     # 乙托嬰無「甲」
+            {"brand": "私立", "members": ["preschool:a", "preschool:zzz"]},  # 成員不存在
+        ]}, ensure_ascii=False))
+        assert run(d, out) == 0
+        blob = (out / "institutions.json").read_text()
+        assert "王大明" not in blob and "basis" not in blob and "issue" not in blob
+        insts = {r["id"]: r for r in json.loads(blob)["records"]}
+        assert insts["preschool:a"]["brand_links"] == {"brand": "私立", "ids": ["babycare:CW1"]}
+        assert insts["babycare:CW1"]["brand_links"] == {"brand": "私立", "ids": ["preschool:a"]}
+        # 廢照日取處分文字裡的生效日，不是處分日（ece:4 處分日 2026-07-01）
+        assert insts["preschool:a"]["revoked_date"] == "2026-08-01"
+        assert insts["babycare:CW1"]["revoked_date"] is None
+
     # 白名單被放寬而放進「非本筆關係人」的姓名時（遮罩涵蓋不到），閘門要擋下來。
     # 本筆自己的關係人姓名會先被全欄位遮罩蓋掉，所以這裡用別筆的人名模擬真實漏法。
     with tempfile.TemporaryDirectory() as tmp:

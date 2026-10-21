@@ -193,6 +193,17 @@ a:hover { color: var(--seal); }
 .badge.open { background: var(--indigo-soft); border-color: #c3d4e2; color: var(--indigo); font-weight: 600; }
 .badge.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
+/* 同品牌提示：查托嬰中心的家長要看得到同品牌幼兒園剛被廢照（夏莉絲案缺口 3） */
+.brandnote {
+  margin-top: 1rem; padding: 0.85rem 1.1rem; background: var(--seal-soft);
+  border-inline-start: 3px solid var(--seal); font-size: 0.875rem;
+}
+.brandnote h2 { margin: 0 0 0.4rem; font-size: 0.9375rem; color: var(--seal); }
+.brandnote ul { margin: 0; padding-inline-start: 1.1rem; }
+.brandnote li { margin-bottom: 0.2rem; }
+.brandnote strong { color: var(--seal); }
+.brandnote p { margin: 0.5rem 0 0; font-size: 0.8125rem; color: var(--ink-soft); }
+
 /* 單欄時裁罰紀錄先出現——那是來訪者要找的東西，基本資料退到後面 */
 .columns { display: grid; gap: 2.5rem; margin-top: 2rem; }
 .columns > .main { order: 1; }

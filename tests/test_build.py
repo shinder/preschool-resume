@@ -255,6 +255,26 @@ def main():
         assert "廢止許可" in listing_page and ">已停辦<" not in listing_page
         assert "短期密集裁罰" in (out / "i/a.html").read_text()
 
+    # 同品牌提示：其他成員的處分狀況攤在機構頁頂部，廢照排最前；沒有清單的機構不出現
+    with tempfile.TemporaryDirectory() as tmp:
+        public, out = Path(tmp) / "public", Path(tmp) / "site"
+        public.mkdir()
+        payloads = json.loads(json.dumps(PUBLIC))
+        recs = payloads["institutions.json"]["records"]
+        recs[1].update(revoked=True, revoked_date="2026-07-29")
+        recs[0]["brand_links"] = {"brand": "私立", "ids": ["preschool:b"]}
+        recs[1]["brand_links"] = {"brand": "私立", "ids": ["preschool:a"]}
+        for name, payload in payloads.items():
+            (public / name).write_text(json.dumps(payload, ensure_ascii=False))
+        assert build.main(["--public", str(public), "--out", str(out)]) == 0
+        page = (out / "i/a.html").read_text()
+        assert '<h2 id="brandnote-h">同品牌機構</h2>' in page
+        assert 'href="/i/b">臺北市私立乙幼兒園</a>：<strong>遭廢止設立許可</strong>' in page
+        assert "2026-07-29" in page and "共用「私立」品牌" in page
+        page_b = (out / "i/b.html").read_text()
+        assert "重大處分 <span class=\"num\">1</span> 筆" in page_b, page_b
+        assert "同品牌機構" not in (out / "i/CW1.html").read_text()
+
     # 路徑閘門：網址不帶 kind 前綴後，native_id 撞名要讓建置失敗而不是互蓋
     with tempfile.TemporaryDirectory() as tmp:
         public, out = Path(tmp) / "public", Path(tmp) / "site"

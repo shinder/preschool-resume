@@ -62,6 +62,25 @@
       <span class="badge">評鑑{{ inst.grade }}{% if inst.grade_year %}（{{ inst.grade_year }} 年度）{% endif %}</span>
       {%- endif %}
     </div>
+    {#- 同品牌提示（docs/07 方向一之 4，保守版）：只列人工查證過的組合，
+        只陳述各機構自己的官方處分，不寫負責人、不寫「同一經營者」。 #}
+    {%- if brand_related %}
+    <section class="brandnote" aria-labelledby="brandnote-h">
+      <h2 id="brandnote-h">同品牌機構</h2>
+      <ul>
+        {%- for b in brand_related %}
+        <li><a href="{{ b.url }}">{{ b.name }}</a>：
+          {%- if b.revoked %}<strong>遭廢止設立許可</strong>{% if b.revoked_date %}（<span class="num">{{ b.revoked_date }}</span>）{% endif %}
+          {%- elif b.severe %}近 {{ recent_years }} 年 <span class="num">{{ b.recent }}</span> 筆裁罰，含<strong>重大處分 <span class="num">{{ b.severe }}</span> 筆</strong>
+          {%- elif b.recent %}近 {{ recent_years }} 年 <span class="num">{{ b.recent }}</span> 筆裁罰
+          {%- else %}近 {{ recent_years }} 年無裁罰紀錄{% endif %}
+          {%- if not b.revoked and not b.is_active %}；名冊顯示已停辦{% endif %}
+        </li>
+        {%- endfor %}
+      </ul>
+      <p>本站經人工查證後，列出名稱共用「{{ brand }}」品牌的機構。各機構的處分紀錄以其官方公告為準，詳見各機構頁。</p>
+    </section>
+    {%- endif %}
   </header>
 
   <div class="columns">
