@@ -17,6 +17,10 @@ LIST_URL = (
     "?page={page}&pagesize={pagesize}&name=&target=&city=0&startDate=&endDate=&dosearch=true"
 )
 PAGESIZE = 100
+# 詳情頁（含公告 PDF）失敗幾筆以上才算整軌失敗。站方偶發 Connection refused，
+# 2,000 筆裡重試後仍漏 1 筆、隔日即補回（2026-09-26、10-17 各一次），不值得
+# 讓 watchdog 報紅。列表頁不適用：一頁就是 100 筆，列表沒走完一律失敗。
+DETAIL_FAIL_LIMIT = 3
 
 DETAIL_RE = re.compile(r'href="/ChildYoungLaw/Detail/(\d+)"')
 FILE_RE = re.compile(r'href="(/UploadFile/Sanction/([^"]+))"')
@@ -97,7 +101,15 @@ def crawl(data_dir: Path, delay: float, limit: int | None, new_only: bool = Fals
             log(f"詳情 {n}/{len(ids)}")
 
     log(f"完成：列表 {page - 1} 頁、詳情 {len(ids)} 筆（{changed} 筆有異動）、失敗 {len(f.failures)} 筆")
-    return 2 if f.failures else 0
+    if not complete:
+        log("列表未完整走完，視為失敗")
+        return 2
+    if len(f.failures) >= DETAIL_FAIL_LIMIT:
+        return 2
+    if f.failures:
+        # 未達門檻：不報紅，但留在 log 裡；漏抓的詳情隔日增量模式會再抓
+        log(f"詳情失敗 {len(f.failures)} 筆，未達 {DETAIL_FAIL_LIMIT} 筆門檻，不視為失敗：{f.failures}")
+    return 0
 
 
 if __name__ == "__main__":
