@@ -76,6 +76,24 @@ def fine_amount(sanction: str | None) -> int:
                default=0)
 
 
+# 處分對象的角色（只輸出角色詞，絕不輸出 person 欄位本身——那裡有姓名）。
+# ece 的 person 一律是「負責人：…」或「行為人：…」；sfaa 的 targets 依類別判。
+# 行為人是教保／托育人員個人（如教保服務人員條例第 40 條），罰的是人不是機構。
+TARGET_ROLES = ("負責人", "行為人", "機構")
+
+
+def target_role(penalty: dict) -> str | None:
+    head = (penalty.get("person") or "").split("：")[0]
+    if head in ("負責人", "行為人"):
+        return head
+    cats = {t.get("category") for t in penalty.get("targets") or []}
+    if "負責人" in cats:
+        return "負責人"
+    if any(c and "機構" in c for c in cats):
+        return "機構"
+    return None
+
+
 def is_severe(sanction: str | None) -> bool:
     return bool(SEVERE_RE.search(sanction or "")) or fine_amount(sanction) >= SEVERE_FINE
 
@@ -197,7 +215,10 @@ def project_institutions(institutions: list[dict], summary: dict,
         pub["last_penalty_date"] = s.get("last_date")
         # 警示分級：重大處分與罰鍰累計看近五年；廢照是機構的終局事實，不分年。
         pub["severe_recent_count"] = s.get("severe_recent", 0)
+        # 總額照舊（含個人罰單，dump 使用者的欄位語意不變）；另拆出行為人個人
+        # 罰鍰，頁面才能分開講「機構被罰多少」與「該園人員個人被罰多少」
         pub["fine_recent_total"] = s.get("fine_recent", 0)
+        pub["fine_recent_staff"] = s.get("fine_recent_staff", 0)
         pub["revoked"] = s.get("revoked", False)
         pub["revoked_date"] = s.get("revoked_date")
         pub["brand_links"] = (brand_links or {}).get(r["id"])
@@ -221,7 +242,8 @@ def project_penalties(penalties: list[dict], links: dict, inst_names: dict,
     out, summary = [], defaultdict(
         lambda: {"count": 0, "recent": 0, "last_date": None,
                  "removed": 0, "archived": 0,
-                 "severe_recent": 0, "fine_recent": 0, "revoked": False,
+                 "severe_recent": 0, "fine_recent": 0, "fine_recent_staff": 0,
+                 "revoked": False,
                  "revoked_date": None, "dates": []})
     for p in penalties:
         link = links.get(p["id"])
@@ -232,6 +254,7 @@ def project_penalties(penalties: list[dict], links: dict, inst_names: dict,
         pub = pick(p, PENALTY_FIELDS, names)
         pub["institution_id"] = iid
         pub["severe"] = is_severe(p.get("sanction"))
+        pub["target_role"] = target_role(p)
         # 處分時名稱與現名不同時保留（機構名屬法人資料，可公開，也是換牌線索）
         former = p.get("institution")
         pub["name_at_penalty"] = (mask_text(former, names)
@@ -253,6 +276,8 @@ def project_penalties(penalties: list[dict], links: dict, inst_names: dict,
             if d >= recent_since:
                 s["recent"] += 1
                 s["fine_recent"] += fine_amount(p.get("sanction"))
+                if pub["target_role"] == "行為人":
+                    s["fine_recent_staff"] += fine_amount(p.get("sanction"))
                 if pub["severe"]:
                     s["severe_recent"] += 1
         if p.get("removed_at") == "unknown":
@@ -400,8 +425,8 @@ def main(argv: list[str]) -> int:
             "penalty_count", "recent_penalty_count", "last_penalty_date",
             "removed_penalty_count", "archived_penalty_count", "vacancy",
             "severe_recent_count", "fine_recent_total", "revoked", "dense",
-            "revoked_date", "brand_links"), "機構"),
-            (pub_penalties, PENALTY_FIELDS + ("severe",), "裁罰"),
+            "revoked_date", "brand_links", "fine_recent_staff"), "機構"),
+            (pub_penalties, PENALTY_FIELDS + ("severe", "target_role"), "裁罰"),
             (pub_aliases, ALIAS_FIELDS, "別名")):
         extra = {k for r in rows for k in r} - set(allowed)
         if extra:

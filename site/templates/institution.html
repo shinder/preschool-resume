@@ -41,8 +41,14 @@
       {%- if inst.dense %}
       <span class="badge severe" title="本站標示：近一年內曾在 30 天內受 3 筆以上裁罰">短期密集裁罰</span>
       {%- endif %}
-      {%- if inst.fine_recent_total %}
-      <span class="badge num" title="本站依公告文字解析加總">近 {{ recent_years }} 年罰鍰累計 {{ "{:,}".format(inst.fine_recent_total) }} 元</span>
+      {#- 行為人罰單罰的是教保／托育人員個人，與機構罰鍰分開講：合併成一個數字
+          會讓人以為機構被罰了那麼多（夏莉絲：新聞稱園方罰 80 萬，本站合計 172 萬） #}
+      {%- set fine_org = (inst.fine_recent_total or 0) - (inst.fine_recent_staff or 0) %}
+      {%- if fine_org %}
+      <span class="badge num" title="本站依公告文字解析加總，處分對象為機構或負責人">近 {{ recent_years }} 年機構罰鍰累計 {{ "{:,}".format(fine_org) }} 元</span>
+      {%- endif %}
+      {%- if inst.fine_recent_staff %}
+      <span class="badge num" title="本站依公告文字解析加總，處分對象為該園教保／托育人員個人">近 {{ recent_years }} 年人員個人罰鍰 {{ "{:,}".format(inst.fine_recent_staff) }} 元</span>
       {%- endif %}
       {%- if older %}
       <span class="badge num">更早 {{ older|length }} 筆</span>
@@ -156,6 +162,7 @@
             </span>
           </header>
           <dl>
+            {%- if p.target_role %}<dt>處分對象</dt><dd>{{ "行為人（人員個人）" if p.target_role == "行為人" else p.target_role }}</dd>{% endif %}
             {%- if p.law %}<dt>依據法規</dt><dd>{{ p.law }}</dd>{% endif %}
             {%- if p.violation %}<dt>違反規定</dt><dd>{{ p.violation }}</dd>{% endif %}
             {%- if p.fact %}<dt>事實摘要</dt><dd>{{ p.fact }}</dd>{% endif %}

@@ -198,6 +198,28 @@ def main():
         assert [x["type"] for x in aliases] == ["renamed"], aliases
         assert "penalty_ids" not in aliases[0]          # 白名單外欄位
 
+    # 處分對象角色：行為人（人員個人）罰鍰另計，總額不變；只輸出角色詞、不輸出姓名
+    with tempfile.TemporaryDirectory() as tmp:
+        d, out = Path(tmp) / "data-repo", Path(tmp) / "out"
+        d.mkdir()
+        setup(d)
+        ece = json.loads((d / "data/ece/penalties.json").read_text())
+        ece["records"][4]["person"] = "行為人：趙錢孫"            # ece:5，60 萬
+        (d / "data/ece/penalties.json").write_text(json.dumps(ece, ensure_ascii=False))
+        assert run(d, out) == 0
+        blob = "".join((out / f).read_text() for f in ("institutions.json", "penalties.json"))
+        assert "趙錢孫" not in blob
+        insts = {r["id"]: r for r in json.loads(
+            (out / "institutions.json").read_text())["records"]}
+        pens = {r["id"]: r for r in json.loads(
+            (out / "penalties.json").read_text())["records"]}
+        a = insts["preschool:a"]
+        assert (a["fine_recent_total"], a["fine_recent_staff"]) == (618_000, 600_000), a
+        assert pens["ece:5"]["target_role"] == "行為人"
+        assert pens["ece:1"]["target_role"] == "負責人"
+        assert {pens[i]["target_role"] for i in pens if i.startswith("sfaa:")} <= {
+            "負責人", "機構", None}
+
     # 同品牌提示（docs/07 方向一之 4）：只收人工清單、且品牌字串真的在名稱裡的組；
     # 查證依據不得外流。品牌不符的組略過但不中止建置。
     with tempfile.TemporaryDirectory() as tmp:

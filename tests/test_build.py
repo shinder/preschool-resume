@@ -27,7 +27,8 @@ PUBLIC = {
          "penalty_count": 2, "last_penalty_date": "2024-01-01",
          "removed_penalty_count": 1, "archived_penalty_count": 0,
          "recent_penalty_count": 1, "severe_recent_count": 1,
-         "fine_recent_total": 66_000, "revoked": False, "dense": False},
+         "fine_recent_total": 66_000, "fine_recent_staff": 60_000,
+         "revoked": False, "dense": False},
         {"id": "preschool:b", "kind": "preschool", "source": "ece", "native_id": "b",
          "name": "臺北市私立乙幼兒園", "city": "臺北市", "town": "中正區",
          "address": "臺北市中正區測試路2號", "lng": 121.51, "lat": 25.01,
@@ -48,7 +49,7 @@ PUBLIC = {
          "violation": "第26條第2項 <未逸出測試>", "fact": None,
          "sanction": "罰鍰：6,000元", "penalty_date": "2024-01-01",
          "removed_at": None, "origin": None, "name_at_penalty": None,
-         "severe": True},
+         "severe": True, "target_role": "行為人"},
         {"id": "ece:2", "source": "ece", "institution_id": "preschool:a",
          "city": "臺北市", "doc_no": "北市教幼字第2號", "law": "幼兒教育及照顧法第52條",
          "violation": "第8條", "fact": None, "sanction": "罰鍰：6,000元",
@@ -112,7 +113,10 @@ def main():
 
         # 警示分級（docs/07 方向一）：徽章、累計罰鍰與卷宗條目的重大處分標記
         assert "重大處分 1 筆" in page
-        assert "近 5 年罰鍰累計 66,000 元" in page
+        # 罰鍰累計依處分對象拆兩項：行為人罰的是人員個人，不是機構
+        assert "近 5 年機構罰鍰累計 6,000 元" in page
+        assert "近 5 年人員個人罰鍰 60,000 元" in page
+        assert "<dt>處分對象</dt><dd>行為人（人員個人）</dd>" in page
         assert 'class="sevmark"' in page
         # 未廢照、未密集者不得冒出對應徽章
         assert "遭廢止設立許可" not in page and "短期密集裁罰" not in page
